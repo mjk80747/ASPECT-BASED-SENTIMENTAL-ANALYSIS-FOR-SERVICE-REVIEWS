@@ -1,0 +1,51 @@
+Notebook
+=======
+
+1. Importing the packages
+2. Exploring the dataset
+    App Review Data
+3. Visualization
+4. Data Processing
+	- Removing the URL and other characters
+	- Remove Punctuations
+	- Remove Stops words
+	- Normalization the data	
+5. Tokenization
+	- CounterVectorizer
+	- Keras Tokenizer
+	- BERT Tokenizer
+6. Feature based on Implicit term extraction
+7. Splitting the data to train and test
+8. Building the Model.
+
+    BERT
+    LSTM + GRU
+    LSTM
+    SVM
+    KNN
+    NaiveBayes
+    XGBoost
+    Voting Classifier(Any Boosted Models)
+
+9. Training the Model 
+10. Building the model 
+
+Flask Framework
+=============
+
+11. Flask Framework with Sqlite for signup and signin
+12. Importing the packages
+13. User gives input 
+14. The given input is preprocessed for prediction
+15. Trained model is used for prediction 
+16. Along with that we Applied LDA model for Topic Modelling
+17. Final outcome is displayed through frontend
+
+ 
+Extension
+========
+
+In the base paper, the author mentioned to use different techniques for analysis the datasets for predicting the sentiment with different dataset and models, 
+As an extension we applied an ensemble method  combining the predictions of multiple individual models to produce a more robust and accurate final prediction.
+However, we can further enhance the performance by exploring other ensemble techniques such as LSTM + GRU and  Voting Classifier  for analysis Dataset, 
+With the above As an extension we can build the front end using flask framework for user testing with authentication.

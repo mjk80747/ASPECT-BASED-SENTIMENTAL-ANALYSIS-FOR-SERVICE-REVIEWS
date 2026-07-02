@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <title>OTP Form</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        body {
+            background-color: #c9d6ff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .otp-container {
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.35);
+            overflow: hidden;
+            width: 400px; /* Increased width */
+            padding: 40px; /* Increased padding */
+            text-align: center;
+        }
+
+        .otp-container h1 {
+            font-size: 28px; /* Increased font size */
+            margin-bottom: 20px; /* Increased margin */
+            color: #333;
+        }
+
+        .otp-container span {
+            font-size: 16px; /* Increased font size */
+            color: #555;
+            margin-bottom: 20px; /* Increased margin */
+            display: block;
+        }
+
+        .otp-container input {
+            background-color: #eee;
+            border: 1px solid #ccc; /* Added border to input fields */
+            margin: 15px 0;
+            padding: 12px 18px; /* Increased padding */
+            font-size: 16px; /* Increased font size */
+            border-radius: 8px;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .otp-container input:focus {
+            border-color: #ffa500; /* Added focus effect */
+        }
+
+        .otp-container button {
+            background-color: orange;
+            color: #fff;
+            font-size: 16px; /* Increased font size */
+            padding: 12px 25px; /* Increased padding */
+            border: 1px solid transparent;
+            border-radius: 8px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin-top: 20px; /* Added margin */
+        }
+
+        .otp-container button:hover {
+            background-color: #ff8c00;
+        }
+
+        .otp-container .resend-btn {
+            background-color: #ddd;
+            color: #333;
+            margin-top: 15px;
+        }
+
+        .otp-container .resend-btn:hover {
+            background-color: #ccc;
+        }
+
+        .otp-container .no-receive {
+            margin-top: 20px;
+            font-size: 14px; /* Increased font size */
+        }
+
+        .otp-container .no-receive a {
+            color: orange;
+            text-decoration: none;
+        }
+
+        .otp-container .no-receive a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <form action="/otp" method="post">
+        <div class="otp-container">
+            <h1>OTP Verification</h1>
+            <span>Enter the OTP sent to your email</span>
+            <input type="text" name="message" placeholder="Enter OTP">
+            <button>Submit</button>
+
+        </div>
+    </form>
+</body>
+
+</html>
