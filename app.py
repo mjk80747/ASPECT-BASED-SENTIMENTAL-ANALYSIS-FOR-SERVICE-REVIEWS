@@ -5,9 +5,27 @@ import numpy as np
 import pandas as pd
 import random
 import sqlite3
-import smtplib 
+import smtplib
 from email.message import EmailMessage
 from werkzeug.utils import secure_filename
+import nltk
+
+_required_nltk = {
+    'punkt': 'tokenizers/punkt',
+    'stopwords': 'corpora/stopwords',
+    'wordnet': 'corpora/wordnet',
+    'omw-1.4': 'corpora/omw-1.4',
+}
+
+def init_nltk_data():
+    for pkg, resource in _required_nltk.items():
+        try:
+            nltk.data.find(resource)
+        except LookupError:
+            nltk.download(pkg, quiet=True)
+
+init_nltk_data()
+
 from topic_modelling import Topic_modeling
 
 import pickle

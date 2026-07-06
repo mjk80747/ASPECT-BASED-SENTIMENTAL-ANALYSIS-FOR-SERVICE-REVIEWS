@@ -6,17 +6,6 @@ from nltk import word_tokenize
 import pandas as pd
 import numpy as np
 
-_required_nltk = {
-    'punkt': 'tokenizers/punkt',
-    'stopwords': 'corpora/stopwords',
-    'wordnet': 'corpora/wordnet',
-    'omw-1.4': 'corpora/omw-1.4',
-}
-for pkg, resource in _required_nltk.items():
-    try:
-        nltk.data.find(resource)
-    except LookupError:
-        nltk.download(pkg)
 
 def Topic_modeling(df):
 
