@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request
+import json
 
 import os
 import numpy as np
@@ -35,7 +36,24 @@ import re
 
 
 app = Flask(__name__)
- 
+
+def init_analytics_db():
+    con = sqlite3.connect('signup.db')
+    con.execute('''
+        CREATE TABLE IF NOT EXISTS analyzed_reviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            review_text TEXT NOT NULL,
+            sentiment TEXT NOT NULL,
+            topic TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    con.commit()
+    con.close()
+
+
+init_analytics_db()
+
 
 cv = pickle.load(open('model.pickle','rb')) 
 model = joblib.load('model.sav')
@@ -82,10 +100,78 @@ def upload():
     #         
     if result == 0:
         pred = "Negative Review, Based on the Input Message!"
+        sentiment = "Negative"
     elif result == 1:
         pred = "Positive Review, Based on the Input Message!"    
+        sentiment = "Positive"
+
+    detected_topic = ', '.join(word) if word else 'Uncategorized'
+    con = sqlite3.connect('signup.db')
+    con.execute(
+        'INSERT INTO analyzed_reviews (review_text, sentiment, topic) VALUES (?, ?, ?)',
+        (message, sentiment, detected_topic),
+    )
+    con.commit()
+    con.close()
     
     return render_template('predict.html', pred_output = pred, message=message, to = t, wo = word)
+
+
+@app.route('/analytics')
+def analytics():
+    con = sqlite3.connect('signup.db')
+    con.row_factory = sqlite3.Row
+    total = con.execute('SELECT COUNT(*) FROM analyzed_reviews').fetchone()[0]
+    sentiment_rows = con.execute(
+        'SELECT sentiment, COUNT(*) AS count FROM analyzed_reviews GROUP BY sentiment'
+    ).fetchall()
+    topic_rows = con.execute(
+        'SELECT topic, COUNT(*) AS count FROM analyzed_reviews GROUP BY topic ORDER BY count DESC LIMIT 8'
+    ).fetchall()
+    topic_sentiment_rows = con.execute('''
+        SELECT topic,
+            SUM(CASE WHEN sentiment = 'Positive' THEN 1 ELSE 0 END) AS positive,
+            SUM(CASE WHEN sentiment = 'Negative' THEN 1 ELSE 0 END) AS negative
+        FROM analyzed_reviews
+        GROUP BY topic
+        ORDER BY COUNT(*) DESC
+        LIMIT 8
+    ''').fetchall()
+    trend_rows = con.execute('''
+        SELECT substr(created_at, 1, 10) AS day,
+            SUM(CASE WHEN sentiment = 'Positive' THEN 1 ELSE 0 END) AS positive,
+            SUM(CASE WHEN sentiment = 'Negative' THEN 1 ELSE 0 END) AS negative
+        FROM analyzed_reviews
+        GROUP BY day
+        ORDER BY day
+    ''').fetchall()
+    recent_rows = con.execute('''
+        SELECT review_text, sentiment, topic, created_at
+        FROM analyzed_reviews
+        ORDER BY id DESC
+        LIMIT 8
+    ''').fetchall()
+    con.close()
+
+    sentiment_counts = {'Positive': 0, 'Negative': 0}
+    for row in sentiment_rows:
+        if row['sentiment'] in sentiment_counts:
+            sentiment_counts[row['sentiment']] = row['count']
+
+    positive = sentiment_counts['Positive']
+    negative = sentiment_counts['Negative']
+    return render_template(
+        'analytics.html',
+        total=total,
+        positive=positive,
+        negative=negative,
+        positive_percent=round(positive / total * 100) if total else 0,
+        negative_percent=round(negative / total * 100) if total else 0,
+        topic_rows=json.dumps([dict(row) for row in topic_rows]),
+        topic_sentiment_rows=json.dumps([dict(row) for row in topic_sentiment_rows]),
+        trend_rows=json.dumps([dict(row) for row in trend_rows]),
+        recent_rows=recent_rows,
+    )
 
 
 @app.route("/signup")
