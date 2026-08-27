@@ -63,11 +63,17 @@ def login():
 
 @app.route('/predict', methods=['GET', 'POST'])
 def upload():
-    message = request.form['message']
+    if request.method == 'GET':
+        return render_template('home.html')
+
+    message = request.form.get('message', '').strip()
+    if not message:
+        return render_template('home.html', prediction_error='Please enter a message to analyze.'), 400
+
     data = [message]
    
     vect = cv.transform(data).toarray()
-    result = model.predict(vect)
+    result = int(model.predict(vect)[0])
 
     df = pd.DataFrame({'sentence':data})
     t,word = Topic_modeling(df)
@@ -91,22 +97,35 @@ def signup():
     number = request.args.get('mobile','')
     password = request.args.get('password','')
     otp = random.randint(100000, 999999)
-    print(otp)
+
+    smtp_user = os.getenv('SMTP_USER')
+    smtp_password = os.getenv('SMTP_PASSWORD')
+    if not smtp_user or not smtp_password:
+        app.logger.error('SMTP_USER and SMTP_PASSWORD must be configured')
+        return render_template(
+            "otp.html",
+            error="Email delivery is not configured. Set SMTP_USER and SMTP_PASSWORD, then try again."
+        ), 503
+
     msg = EmailMessage()
     msg.set_content("Your OTP is : "+str(otp))
     msg['Subject'] = 'OTP'
-    msg['From'] = "myprojectstp@gmail.com"
+    msg['From'] = smtp_user
     msg['To'] = email
     
     
     try:
-        s =  smtplib.SMTP('smtp.gmail.com', 587)     
+        s = smtplib.SMTP('smtp.gmail.com', 587, timeout=20)
         s.starttls()
-        s.login("myprojectstp@gmail.com", "paxgxdrhifmqcrzn")
+        s.login(smtp_user, smtp_password)
         s.send_message(msg)
         s.quit()
     except Exception as e:
-        print(f"Could not send email: {e}")
+        app.logger.exception("Could not send OTP email: %s", e)
+        return render_template(
+            "otp.html",
+            error="We could not send the OTP. Check the SMTP settings and try again."
+        ), 502
     return render_template("otp.html") 
 
 

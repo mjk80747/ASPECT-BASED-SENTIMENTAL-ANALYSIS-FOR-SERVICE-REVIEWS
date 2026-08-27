@@ -10,7 +10,7 @@ import numpy as np
 def Topic_modeling(df):
 
     stop_words=list(nltk.corpus.stopwords.words('english'))
-    df['clean_doc'] = df['sentence'].str.replace("[^a-zA-Z#]", " ")
+    df['clean_doc'] = df['sentence'].str.replace("[^a-zA-Z#]", " ", regex=True)
 
     # cleaning the text
     def clean_text(headline):
@@ -20,6 +20,9 @@ def Topic_modeling(df):
         cleaned_text=" ".join(tokens)
         return cleaned_text
     df['clean_doc'] = df['clean_doc'].apply(clean_text)
+
+    if not df['clean_doc'].str.strip().any():
+        return -1, []
 
     # Tf-idf for the data
     vect =TfidfVectorizer(stop_words=stop_words,max_features=1000)

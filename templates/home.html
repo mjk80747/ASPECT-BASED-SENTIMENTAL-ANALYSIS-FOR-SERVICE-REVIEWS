@@ -129,6 +129,9 @@
 				<div class="row align-items-center">
 					<form action="/predict" method="POST" class="text-center">
 						<h1 style="color: #08233f;" class="text-dark mb-4">Enter Your Message Here</h1>
+                        {% if prediction_error %}
+                        <p style="color: #b42318;">{{ prediction_error }}</p>
+                        {% endif %}
 						<div>
 							<textarea name="message" rows="6" cols="80" class="form-control mb-4" placeholder="Type your message here..."></textarea>
 							<br/>

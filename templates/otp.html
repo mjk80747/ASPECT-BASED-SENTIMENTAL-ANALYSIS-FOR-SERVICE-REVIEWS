@@ -48,6 +48,12 @@
             display: block;
         }
 
+        .otp-container .error {
+            color: #b42318;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
         .otp-container input {
             background-color: #eee;
             border: 1px solid #ccc; /* Added border to input fields */
@@ -114,6 +120,9 @@
         <div class="otp-container">
             <h1>OTP Verification</h1>
             <span>Enter the OTP sent to your email</span>
+            {% if error %}
+            <p class="error">{{ error }}</p>
+            {% endif %}
             <input type="text" name="message" placeholder="Enter OTP">
             <button>Submit</button>
 
