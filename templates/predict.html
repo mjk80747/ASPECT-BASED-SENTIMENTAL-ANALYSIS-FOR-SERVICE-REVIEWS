@@ -140,6 +140,17 @@
                             <h3 style="font-size: xx-large; color: rgb(83, 238, 11);">{{ pred_output }}</h3>
                         </div>
                         <br>
+                        <h3 style="font-size: xx-large; color: #08233f;">Detected service or product aspects</h3>
+                        {% if aspects %}
+                        <ul class="list-group list-group-horizontal">
+                            {% for aspect in aspects %}
+                                <li class="list-group-item">{{ aspect }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p>No specific aspect was detected. Try mentioning the product, price, delivery, seller, staff, or service.</p>
+                        {% endif %}
+                        <br>
                         <h3 style="font-size: xx-large; color: rgb(14, 36, 4);">The topic for the paragraph is most depended upon:</h3>
                         
                         <ul class="list-group list-group-horizontal">

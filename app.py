@@ -45,9 +45,13 @@ def init_analytics_db():
             review_text TEXT NOT NULL,
             sentiment TEXT NOT NULL,
             topic TEXT NOT NULL,
+            aspects TEXT NOT NULL DEFAULT '[]',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    columns = [row[1] for row in con.execute('PRAGMA table_info(analyzed_reviews)')]
+    if 'aspects' not in columns:
+        con.execute("ALTER TABLE analyzed_reviews ADD COLUMN aspects TEXT NOT NULL DEFAULT '[]'")
     con.commit()
     con.close()
 
@@ -57,6 +61,85 @@ init_analytics_db()
 
 cv = pickle.load(open('model.pickle','rb')) 
 model = joblib.load('model.sav')
+
+SENTIMENT_LABELS = [
+    'Very Negative',
+    'Negative',
+    'Neutral',
+    'Mixed',
+    'Positive',
+    'Very Positive',
+]
+POSITIVE_CUES = {
+    'amazing', 'best', 'decent', 'excellent', 'fairly', 'fantastic',
+    'fine', 'friendly', 'good', 'great', 'helpful', 'love', 'perfect',
+    'quick', 'recommend', 'satisfied', 'smooth', 'useful', 'wonderful',
+}
+NEGATIVE_CUES = {
+    'awful', 'bad', 'broken', 'complaint', 'delay', 'dirty',
+    'late', 'poor', 'rude', 'slow', 'terrible', 'unhappy',
+    'worst', 'disappointed',
+}
+VERY_POSITIVE_CUES = {'amazing', 'best', 'excellent', 'fantastic', 'perfect', 'wonderful'}
+VERY_NEGATIVE_CUES = {'awful', 'broken', 'hate', 'terrible', 'worst', 'disappointed'}
+NEUTRAL_CUES = {'average', 'okay', 'ordinary', 'standard', 'typical', 'usual'}
+ASPECT_KEYWORDS = {
+    'Product quality': {'quality', 'material', 'durable', 'defect', 'broken', 'design', 'feature'},
+    'Price and value': {'price', 'cost', 'value', 'expensive', 'cheap', 'discount', 'offer'},
+    'Delivery': {'delivery', 'deliver', 'shipping', 'arrived', 'arrival', 'late', 'package'},
+    'Packaging': {'package', 'packaging', 'packed', 'box', '包装', 'damaged'},
+    'Seller': {'seller', 'vendor', 'merchant', 'seller'},
+    'Returns and refund': {'return', 'refund', 'replacement', 'exchange', 'cancel'},
+    'Customer support': {'support', 'helpdesk', 'complaint', 'response', 'agent', 'staff', 'service'},
+    'Food and taste': {'food', 'taste', 'flavor', 'meal', 'dish', 'menu', 'restaurant'},
+    'Waiting time': {'wait', 'waiting', 'queue', 'speed', 'slow', 'quick', 'delay'},
+    'Cleanliness': {'clean', 'cleanliness', 'dirty', 'hygiene', 'room'},
+    'Ambience': {'ambience', 'atmosphere', 'environment', 'location', 'comfort'},
+    'Booking and reliability': {'booking', 'reservation', 'reliable', 'appointment', 'schedule'},
+}
+
+
+def classify_sentiment(message, vectorized_message):
+    probabilities = model.predict_proba(vectorized_message)[0]
+    class_probabilities = dict(zip(model.classes_, probabilities))
+    positive_probability = float(class_probabilities.get(1, 0))
+    words = set(re.findall(r"[a-z']+", message.lower()))
+    positive_cues = len(words & POSITIVE_CUES)
+    negative_cues = len(words & NEGATIVE_CUES)
+    neutral_cues = len(words & NEUTRAL_CUES)
+    very_positive_cues = len(words & VERY_POSITIVE_CUES)
+    very_negative_cues = len(words & VERY_NEGATIVE_CUES)
+
+    if positive_cues and negative_cues:
+        return 'Mixed'
+    if neutral_cues and not positive_cues and not negative_cues:
+        return 'Neutral'
+    if very_positive_cues and not negative_cues:
+        return 'Very Positive'
+    if very_negative_cues and not positive_cues:
+        return 'Very Negative'
+    if positive_cues and not negative_cues:
+        return 'Positive'
+    if negative_cues and not positive_cues:
+        return 'Negative'
+    if positive_probability >= 0.85:
+        return 'Very Positive'
+    if positive_probability >= 0.60:
+        return 'Positive'
+    if positive_probability <= 0.15:
+        return 'Very Negative'
+    if positive_probability <= 0.40:
+        return 'Negative'
+    return 'Neutral'
+
+
+def extract_aspects(message):
+    words = set(re.findall(r"[a-z']+", message.lower()))
+    detected = []
+    for aspect, keywords in ASPECT_KEYWORDS.items():
+        if words & {keyword for keyword in keywords if keyword.isascii()}:
+            detected.append(aspect)
+    return detected
 
 @app.route("/")
 def index():
@@ -91,30 +174,27 @@ def upload():
     data = [message]
    
     vect = cv.transform(data).toarray()
-    result = int(model.predict(vect)[0])
+    sentiment = classify_sentiment(message, vect)
+    aspects = extract_aspects(message)
 
     df = pd.DataFrame({'sentence':data})
     t,word = Topic_modeling(df)
 
-    #result = model.predict(vectorized_text)[0]
-    #         
-    if result == 0:
-        pred = "Negative Review, Based on the Input Message!"
-        sentiment = "Negative"
-    elif result == 1:
-        pred = "Positive Review, Based on the Input Message!"    
-        sentiment = "Positive"
+    pred = f"{sentiment} Review, Based on the Input Message!"
 
     detected_topic = ', '.join(word) if word else 'Uncategorized'
     con = sqlite3.connect('signup.db')
     con.execute(
-        'INSERT INTO analyzed_reviews (review_text, sentiment, topic) VALUES (?, ?, ?)',
-        (message, sentiment, detected_topic),
+        'INSERT INTO analyzed_reviews (review_text, sentiment, topic, aspects) VALUES (?, ?, ?, ?)',
+        (message, sentiment, detected_topic, json.dumps(aspects)),
     )
     con.commit()
     con.close()
     
-    return render_template('predict.html', pred_output = pred, message=message, to = t, wo = word)
+    return render_template(
+        'predict.html', pred_output=pred, message=message, to=t, wo=word,
+        aspects=aspects,
+    )
 
 
 @app.route('/analytics')
@@ -130,8 +210,12 @@ def analytics():
     ).fetchall()
     topic_sentiment_rows = con.execute('''
         SELECT topic,
+            SUM(CASE WHEN sentiment = 'Very Positive' THEN 1 ELSE 0 END) AS very_positive,
             SUM(CASE WHEN sentiment = 'Positive' THEN 1 ELSE 0 END) AS positive,
-            SUM(CASE WHEN sentiment = 'Negative' THEN 1 ELSE 0 END) AS negative
+            SUM(CASE WHEN sentiment = 'Neutral' THEN 1 ELSE 0 END) AS neutral,
+            SUM(CASE WHEN sentiment = 'Mixed' THEN 1 ELSE 0 END) AS mixed,
+            SUM(CASE WHEN sentiment = 'Negative' THEN 1 ELSE 0 END) AS negative,
+            SUM(CASE WHEN sentiment = 'Very Negative' THEN 1 ELSE 0 END) AS very_negative
         FROM analyzed_reviews
         GROUP BY topic
         ORDER BY COUNT(*) DESC
@@ -139,8 +223,12 @@ def analytics():
     ''').fetchall()
     trend_rows = con.execute('''
         SELECT substr(created_at, 1, 10) AS day,
+            SUM(CASE WHEN sentiment = 'Very Positive' THEN 1 ELSE 0 END) AS very_positive,
             SUM(CASE WHEN sentiment = 'Positive' THEN 1 ELSE 0 END) AS positive,
-            SUM(CASE WHEN sentiment = 'Negative' THEN 1 ELSE 0 END) AS negative
+            SUM(CASE WHEN sentiment = 'Neutral' THEN 1 ELSE 0 END) AS neutral,
+            SUM(CASE WHEN sentiment = 'Mixed' THEN 1 ELSE 0 END) AS mixed,
+            SUM(CASE WHEN sentiment = 'Negative' THEN 1 ELSE 0 END) AS negative,
+            SUM(CASE WHEN sentiment = 'Very Negative' THEN 1 ELSE 0 END) AS very_negative
         FROM analyzed_reviews
         GROUP BY day
         ORDER BY day
@@ -153,13 +241,13 @@ def analytics():
     ''').fetchall()
     con.close()
 
-    sentiment_counts = {'Positive': 0, 'Negative': 0}
+    sentiment_counts = {label: 0 for label in SENTIMENT_LABELS}
     for row in sentiment_rows:
         if row['sentiment'] in sentiment_counts:
             sentiment_counts[row['sentiment']] = row['count']
-
-    positive = sentiment_counts['Positive']
-    negative = sentiment_counts['Negative']
+    positive = sentiment_counts['Positive'] + sentiment_counts['Very Positive']
+    negative = sentiment_counts['Negative'] + sentiment_counts['Very Negative']
+    overall_sentiment = max(sentiment_counts, key=sentiment_counts.get) if total else 'No data'
     return render_template(
         'analytics.html',
         total=total,
@@ -167,6 +255,12 @@ def analytics():
         negative=negative,
         positive_percent=round(positive / total * 100) if total else 0,
         negative_percent=round(negative / total * 100) if total else 0,
+        sentiment_labels=json.dumps(SENTIMENT_LABELS),
+        sentiment_counts=json.dumps([sentiment_counts[label] for label in SENTIMENT_LABELS]),
+        sentiment_labels_display=SENTIMENT_LABELS,
+        sentiment_count_values=[sentiment_counts[label] for label in SENTIMENT_LABELS],
+        neutral_mixed=sentiment_counts['Neutral'] + sentiment_counts['Mixed'],
+        overall_sentiment=overall_sentiment,
         topic_rows=json.dumps([dict(row) for row in topic_rows]),
         topic_sentiment_rows=json.dumps([dict(row) for row in topic_sentiment_rows]),
         trend_rows=json.dumps([dict(row) for row in trend_rows]),
