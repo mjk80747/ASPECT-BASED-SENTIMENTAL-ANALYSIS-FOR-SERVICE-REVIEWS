@@ -8,6 +8,7 @@ import random
 import sqlite3
 import smtplib
 from email.message import EmailMessage
+from email.utils import parseaddr
 from werkzeug.utils import secure_filename
 import nltk
 
@@ -278,13 +279,21 @@ def signup():
     password = request.args.get('password','')
     otp = random.randint(100000, 999999)
 
-    smtp_user = os.getenv('SMTP_USER')
-    smtp_password = os.getenv('SMTP_PASSWORD')
+    smtp_user = os.getenv('SMTP_USER', '').strip()
+    smtp_password = os.getenv('SMTP_PASSWORD', '').strip()
+    smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com').strip()
+    smtp_port = int(os.getenv('SMTP_PORT', '587'))
     if not smtp_user or not smtp_password:
         app.logger.error('SMTP_USER and SMTP_PASSWORD must be configured')
         return render_template(
             "otp.html",
             error="Email delivery is not configured. Set SMTP_USER and SMTP_PASSWORD, then try again."
+        ), 503
+    if parseaddr(smtp_user)[1] != smtp_user or '@' not in smtp_user:
+        app.logger.error('SMTP_USER must be a complete email address')
+        return render_template(
+            "otp.html",
+            error="Email delivery is not configured correctly. SMTP_USER must be a complete email address."
         ), 503
 
     msg = EmailMessage()
@@ -295,11 +304,10 @@ def signup():
     
     
     try:
-        s = smtplib.SMTP('smtp.gmail.com', 587, timeout=20)
-        s.starttls()
-        s.login(smtp_user, smtp_password)
-        s.send_message(msg)
-        s.quit()
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as smtp:
+            smtp.starttls()
+            smtp.login(smtp_user, smtp_password)
+            smtp.send_message(msg)
     except Exception as e:
         app.logger.exception("Could not send OTP email: %s", e)
         return render_template(
