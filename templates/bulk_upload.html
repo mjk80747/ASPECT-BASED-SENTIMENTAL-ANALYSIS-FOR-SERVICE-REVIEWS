@@ -367,6 +367,7 @@
         {% endif %}
 
         <form id="uploadForm" method="post" action="{{ url_for('bulk_upload') }}" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="dropzone-card" id="dropzone">
                 <input type="file" name="file" id="fileInput" class="file-input" accept=".csv, .xlsx, .xls" required>
                 <div class="drop-icon">

@@ -11,3 +11,8 @@ scipy==1.18.0
 nltk==3.9.4
 joblib==1.5.2
 gunicorn==26.0.0
+Flask-Login==0.6.3
+Flask-Limiter==3.8.0
+Flask-WTF==1.2.1
+bleach==6.2.0
+python-dotenv==1.0.1

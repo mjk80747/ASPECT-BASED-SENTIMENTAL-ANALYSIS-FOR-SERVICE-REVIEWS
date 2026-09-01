@@ -2,7 +2,6 @@ from flask import Flask, render_template, request, redirect, url_for, session, R
 import csv
 import json
 from io import BytesIO, StringIO
-
 import os
 import numpy as np
 import pandas as pd
@@ -12,7 +11,20 @@ import smtplib
 from email.message import EmailMessage
 from email.utils import parseaddr
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime, timezone, timedelta
+from functools import wraps
+import logging
 import nltk
+
+from dotenv import load_dotenv
+load_dotenv()
+
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_wtf.csrf import CSRFProtect
+import bleach
 
 _required_nltk = {
     'punkt': 'tokenizers/punkt',
@@ -36,10 +48,90 @@ import pickle
 import joblib
 import re
 
-
-
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'service-industry-admin-dashboard-secret')
+app.config.update(
+    SECRET_KEY=os.environ.get("SECRET_KEY", os.urandom(32).hex()),
+    MAX_CONTENT_LENGTH=5 * 1024 * 1024,  # 5 MB max upload limit
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=os.environ.get("FLASK_ENV") == "production",
+    SESSION_COOKIE_SAMESITE="Lax",
+    PERMANENT_SESSION_LIFETIME=timedelta(minutes=30),
+)
+
+csrf = CSRFProtect(app)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+)
+logger = logging.getLogger("security")
+
+@app.after_request
+def add_security_headers(response):
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; "
+        "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
+        "img-src 'self' data:;"
+    )
+    return response
+
+class User(UserMixin):
+    def __init__(self, id, user, name, email, mobile, role):
+        self.id = str(id)
+        self.user = user
+        self.name = name
+        self.email = email
+        self.mobile = mobile
+        self.role = role
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'signin'
+
+@login_manager.user_loader
+def load_user(user_id):
+    con = sqlite3.connect('signup.db')
+    con.row_factory = sqlite3.Row
+    row = con.execute("SELECT id, user, name, email, mobile, role FROM info WHERE id = ?", (user_id,)).fetchone()
+    con.close()
+    if row:
+        return User(row['id'], row['user'], row['name'], row['email'], row['mobile'], row['role'] or 'user')
+    return None
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or getattr(current_user, 'role', '') != 'admin':
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri="memory://"
+)
+
+BLOCKLIST_PASSWORDS = {'password', '12345678', '123456789', 'admin123', 'qwerty', 'password123', 'letmein'}
+
+def validate_strong_password(password):
+    if not password or len(password) < 10:
+        return "Password must be at least 10 characters long."
+    if password.lower() in BLOCKLIST_PASSWORDS:
+        return "This password is too common and unsafe. Please choose a stronger password."
+    if not re.search(r'[A-Z]', password):
+        return "Password must contain at least one uppercase letter."
+    if not re.search(r'[a-z]', password):
+        return "Password must contain at least one lowercase letter."
+    if not re.search(r'[0-9]', password):
+        return "Password must contain at least one number."
+    return None
 
 def init_analytics_db():
     con = sqlite3.connect('signup.db')
@@ -95,20 +187,33 @@ def init_analytics_db():
             SELECT {column_sql} FROM info_old''')
         con.execute('DROP TABLE info_old')
 
+    users_rows = con.execute("SELECT id, password FROM info").fetchall()
+    for u_id, u_pass in users_rows:
+        if u_pass and not (u_pass.startswith('scrypt:') or u_pass.startswith('pbkdf2:') or u_pass.startswith('argon2:')):
+            hashed = generate_password_hash(u_pass)
+            con.execute("UPDATE info SET password = ? WHERE id = ?", (hashed, u_id))
+
     con.commit()
     con.close()
-
 
 def ensure_default_admin():
     con = sqlite3.connect('signup.db')
     cur = con.cursor()
-    cur.execute(
-        "INSERT OR IGNORE INTO info (user, name, email, mobile, password, role) VALUES (?, ?, ?, ?, ?, ?)",
-        ('admin', 'Administrator', 'admin@service.com', '0000000000', 'admin123', 'admin')
-    )
+    cur.execute("SELECT id, password FROM info WHERE user = ?", ('admin',))
+    existing = cur.fetchone()
+    if not existing:
+        hashed_pass = generate_password_hash('admin123')
+        cur.execute(
+            "INSERT INTO info (user, name, email, mobile, password, role) VALUES (?, ?, ?, ?, ?, ?)",
+            ('admin', 'Administrator', 'admin@service.com', '0000000000', hashed_pass, 'admin')
+        )
+    else:
+        admin_pass = existing[1]
+        if admin_pass and not (admin_pass.startswith('scrypt:') or admin_pass.startswith('pbkdf2:') or admin_pass.startswith('argon2:')):
+            hashed_pass = generate_password_hash(admin_pass)
+            cur.execute("UPDATE info SET password = ? WHERE id = ?", (hashed_pass, existing[0]))
     con.commit()
     con.close()
-
 
 init_analytics_db()
 ensure_default_admin()
@@ -222,9 +327,14 @@ def upload():
     if request.method == 'GET':
         return render_template('home.html')
 
-    message = request.form.get('message', '').strip()
-    if not message:
+    raw_message = request.form.get('message', '').strip()
+    if not raw_message:
         return render_template('home.html', prediction_error='Please enter a message to analyze.'), 400
+
+    if len(raw_message) > 5000:
+        return render_template('home.html', prediction_error='Message text is too long (maximum 5,000 characters).'), 400
+
+    message = bleach.clean(raw_message, strip=True)
 
     data = [message]
    
@@ -324,13 +434,29 @@ def analytics():
 
 
 @app.route("/signup")
+@limiter.limit("3 per 5 minutes")
 def signup():
-    global otp, username, email, number, password
-    username = request.args.get('user','')
-    email = request.args.get('email','')
-    number = request.args.get('mobile','')
-    password = request.args.get('password','')
-    otp = random.randint(100000, 999999)
+    username = request.args.get('user', '').strip()
+    email = request.args.get('email', '').strip()
+    number = request.args.get('mobile', '').strip()
+    password = request.args.get('password', '').strip()
+
+    if not username or not email or not password:
+        return render_template("signin.html", error="Username, Email, and Password are required.")
+
+    pwd_err = validate_strong_password(password)
+    if pwd_err:
+        return render_template("signin.html", error=pwd_err)
+
+    con = sqlite3.connect('signup.db')
+    cur = con.cursor()
+    cur.execute("SELECT id FROM info WHERE LOWER(user) = LOWER(?) OR LOWER(email) = LOWER(?)", (username, email))
+    if cur.fetchone():
+        con.close()
+        return render_template("signin.html", error="Username or email is already registered.")
+    con.close()
+
+    otp_code = random.randint(100000, 999999)
 
     smtp_user = os.getenv('SMTP_USER', '').strip()
     smtp_password = os.getenv('SMTP_PASSWORD', '').strip()
@@ -350,12 +476,11 @@ def signup():
         ), 503
 
     msg = EmailMessage()
-    msg.set_content("Your OTP is : "+str(otp))
+    msg.set_content("Your OTP is : " + str(otp_code))
     msg['Subject'] = 'OTP'
     msg['From'] = smtp_user
     msg['To'] = email
-    
-    
+
     try:
         with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as smtp:
             smtp.starttls()
@@ -367,75 +492,117 @@ def signup():
             "otp.html",
             error="We could not send the OTP. Check the SMTP settings and try again."
         ), 502
-    return render_template("otp.html") 
+
+    session['pending_signup'] = {
+        'username': username,
+        'email': email,
+        'number': number,
+        'password': generate_password_hash(password),
+        'otp': otp_code,
+        'expires_at': (datetime.now(timezone.utc) + timedelta(minutes=10)).timestamp()
+    }
+
+    return render_template("otp.html")
 
 
 @app.route('/otp', methods=['POST'])
 def otp():
-    global otp, username, email, number, password
-    if request.method == 'POST':
-        message = request.form['message']
-        print(message)
-        if int(message) == otp:
-            print("TRUE")
-            con = sqlite3.connect('signup.db')
-            cur = con.cursor()
-            cur.execute("insert into `info` (`user`,`name`, `email`,`mobile`,`password`) VALUES (?, ?, ?, ?, ?)",(username, username, email, number, password))
+    pending = session.get('pending_signup')
+    if not pending:
+        return render_template("signin.html", error="Session expired. Please try signing up again.")
+
+    user_otp = request.form.get('message', '').strip()
+    now_ts = datetime.now(timezone.utc).timestamp()
+
+    if now_ts > pending.get('expires_at', 0):
+        session.pop('pending_signup', None)
+        return render_template("signin.html", error="OTP has expired. Please try signing up again.")
+
+    if user_otp.isdigit() and int(user_otp) == pending.get('otp'):
+        con = sqlite3.connect('signup.db')
+        cur = con.cursor()
+        try:
+            cur.execute(
+                "INSERT INTO info (user, name, email, mobile, password) VALUES (?, ?, ?, ?, ?)",
+                (pending['username'], pending['username'], pending['email'], pending['number'], pending['password'])
+            )
             con.commit()
+        except sqlite3.IntegrityError:
             con.close()
-            return render_template("signin.html")
-    return render_template("signin.html")
+            session.pop('pending_signup', None)
+            return render_template("signin.html", error="Username or email is already registered.")
+        con.close()
+        session.pop('pending_signup', None)
+        return render_template("signin.html", success="Account created successfully! Please sign in.")
+
+    return render_template("otp.html", error="Invalid OTP. Please try again.")
 
 
 @app.route("/signin", methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def signin():
     if request.method == 'POST':
-        mail1 = request.form.get('user', '').strip()
-        password1 = request.form.get('password', '').strip()
+        login_input = request.form.get('user', '').strip()
+        password_input = request.form.get('password', '').strip()
     else:
-        mail1 = request.args.get('user', '').strip()
-        password1 = request.args.get('password', '').strip()
+        login_input = request.args.get('user', '').strip()
+        password_input = request.args.get('password', '').strip()
 
-    if mail1 == 'admin' and password1 == 'admin123':
-        session['user'] = mail1
-        session['role'] = 'admin'
-        return redirect(url_for('admin_dashboard'))
+    if not login_input and not password_input:
+        return render_template("signin.html")
+
+    if not login_input or not password_input:
+        return render_template("signin.html", error='Please provide both username/email and password.')
 
     con = sqlite3.connect('signup.db')
-    cur = con.cursor()
-    cur.execute("select `user`, `password`, `role` from info where `user` = ? AND `password` = ?", (mail1, password1,))
-    data = cur.fetchone()
+    con.row_factory = sqlite3.Row
+    row = con.execute(
+        "SELECT id, user, name, email, mobile, password, role FROM info WHERE LOWER(user) = LOWER(?) OR LOWER(email) = LOWER(?)",
+        (login_input, login_input)
+    ).fetchone()
     con.close()
 
-    if data is None:
-        return render_template("signin.html", error='Invalid username or password.')
-
-    if mail1 == str(data[0]) and password1 == str(data[1]):
-        session['user'] = str(data[0])
-        session['role'] = str(data[2] or 'user')
+    if row and check_password_hash(row['password'], password_input):
+        user_obj = User(row['id'], row['user'], row['name'], row['email'], row['mobile'], row['role'] or 'user')
+        session.permanent = True
+        login_user(user_obj, remember=True)
+        session['user'] = user_obj.user
+        session['role'] = user_obj.role
+        logger.info(f"Successful user login for '{user_obj.user}' from IP {request.remote_addr}")
+        if user_obj.role == 'admin':
+            return redirect(url_for('admin_dashboard'))
         return redirect(url_for('home'))
 
-    return render_template("signin.html", error='Invalid username or password.')
+    logger.warning(f"Failed user login attempt for '{login_input}' from IP {request.remote_addr}")
+    return render_template("signin.html", error='Invalid username/email or password.')
 
 
 @app.route('/admin/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
 def admin_login():
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        password = request.form.get('password', '').strip()
+        login_input = request.form.get('username', '').strip()
+        password_input = request.form.get('password', '').strip()
 
         con = sqlite3.connect('signup.db')
-        cur = con.cursor()
-        cur.execute("SELECT user, password, role FROM info WHERE user = ? AND password = ?", (username, password))
-        data = cur.fetchone()
+        con.row_factory = sqlite3.Row
+        row = con.execute(
+            "SELECT id, user, name, email, mobile, password, role FROM info WHERE (LOWER(user) = LOWER(?) OR LOWER(email) = LOWER(?)) AND role = 'admin'",
+            (login_input, login_input)
+        ).fetchone()
         con.close()
 
-        if data and username == str(data[0]) and password == str(data[1]) and str(data[2] or 'user') == 'admin':
-            session['user'] = username
+        if row and check_password_hash(row['password'], password_input):
+            user_obj = User(row['id'], row['user'], row['name'], row['email'], row['mobile'], row['role'])
+            session.permanent = True
+            login_user(user_obj, remember=True)
+            session['user'] = user_obj.user
             session['role'] = 'admin'
+            logger.info(f"Successful admin login for '{user_obj.user}' from IP {request.remote_addr}")
             return redirect(url_for('admin_dashboard'))
 
-        return render_template('admin_login.html', error='Invalid admin username or password.')
+        logger.warning(f"Failed admin login attempt for '{login_input}' from IP {request.remote_addr}")
+        return render_template('admin_login.html', error='Invalid admin username/email or password.')
 
     return render_template('admin_login.html')
 
@@ -613,9 +780,14 @@ def edit_user(user_id):
         con = sqlite3.connect('signup.db')
         cur = con.cursor()
         if password:
+            pwd_err = validate_strong_password(password)
+            if pwd_err:
+                con.close()
+                return render_template('admin_edit_user.html', user=dict(user), error=pwd_err)
+            hashed_p = generate_password_hash(password)
             cur.execute(
                 "UPDATE info SET user = ?, name = ?, email = ?, mobile = ?, password = ?, role = ? WHERE id = ?",
-                (username, name, email, mobile, password, role, user_id)
+                (username, name, email, mobile, hashed_p, role, user_id)
             )
         else:
             cur.execute(
@@ -709,6 +881,7 @@ def admin_raw_data():
 
 @app.route('/logout')
 def logout():
+    logout_user()
     session.clear()
     return redirect(url_for('login'))
 
@@ -727,19 +900,24 @@ def bulk_upload():
     filename = secure_filename(file.filename)
     ext = os.path.splitext(filename)[1].lower()
     
+    if ext not in ['.csv', '.xlsx']:
+        return render_template('bulk_upload.html', error_msg='Unsupported file format. Only .csv and .xlsx files are permitted.')
+
     try:
         if ext == '.csv':
             df = pd.read_csv(file)
-        elif ext in ['.xlsx', '.xls']:
+        elif ext == '.xlsx':
             df = pd.read_excel(file)
-        else:
-            return render_template('bulk_upload.html', error_msg='Unsupported file format. Please upload a .csv, .xlsx, or .xls file.')
     except Exception as e:
-        return render_template('bulk_upload.html', error_msg=f'Error reading file: {str(e)}')
+        logger.warning(f"Error parsing uploaded file '{filename}': {str(e)}")
+        return render_template('bulk_upload.html', error_msg='Error reading file payload. Ensure the file is a valid CSV or Excel file.')
     
     if df.empty:
         return render_template('bulk_upload.html', error_msg='Uploaded file is empty.')
     
+    if len(df) > 1000:
+        return render_template('bulk_upload.html', error_msg='File contains too many rows (maximum 1,000 rows per batch upload allowed).')
+
     candidate_cols = ['review', 'text', 'comment', 'feedback', 'review_text', 'comments', 'reviews', 'message']
     target_col = None
     for col in df.columns:
@@ -758,10 +936,11 @@ def bulk_upload():
     db_records = []
     
     for _, row in df.iterrows():
-        review_text = str(row[target_col]).strip() if pd.notna(row[target_col]) else ''
-        if not review_text or len(review_text) < 2:
+        raw_review = str(row[target_col]).strip() if pd.notna(row[target_col]) else ''
+        if not raw_review or len(raw_review) < 2:
             continue
             
+        review_text = bleach.clean(raw_review[:5000], strip=True)
         vectorized = cv.transform([review_text])
         sentiment = classify_sentiment(review_text, vectorized)
         aspects = extract_aspects(review_text)
@@ -790,7 +969,8 @@ def bulk_upload():
         )
         con.commit()
         con.close()
-        
+        logger.info(f"Processed bulk upload of {len(db_records)} records from file '{filename}' by user '{getattr(current_user, 'user', 'guest')}'")
+
     total_count = len(processed_results)
     if total_count == 0:
         return render_template('bulk_upload.html', error_msg='No valid text reviews found in file.')
@@ -869,5 +1049,20 @@ def download_bulk_export():
 def notebook():
     return render_template('Notebook.html')
 
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    return render_template('home.html', prediction_error='File payload too large. Maximum allowed upload size is 5 MB.'), 413
+
+@app.errorhandler(400)
+def bad_request_error(error):
+    return render_template('home.html', prediction_error='Bad request or invalid security CSRF token.'), 400
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    is_debug = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
+    # Run with HTTPS using self-signed SSL certificates
+    app.run(
+        host='0.0.0.0', 
+        port=5000, 
+        debug=is_debug,
+        ssl_context=('cert.pem', 'key.pem')
+    )
