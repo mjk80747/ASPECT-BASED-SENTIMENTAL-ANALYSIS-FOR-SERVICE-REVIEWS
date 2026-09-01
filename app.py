@@ -1059,10 +1059,13 @@ def bad_request_error(error):
 
 if __name__ == '__main__':
     is_debug = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
-    # Run with HTTPS using self-signed SSL certificates
-    app.run(
-        host='0.0.0.0', 
-        port=5000, 
-        debug=is_debug,
-        ssl_context=('cert.pem', 'key.pem')
-    )
+    cert_path = os.environ.get('SSL_CERT_PATH', 'cert.pem')
+    key_path = os.environ.get('SSL_KEY_PATH', 'key.pem')
+    use_https = os.environ.get('USE_HTTPS', 'false').lower() == 'true'
+
+    # Do not force self-signed certificates by default. Browsers reject them with
+    # NET::ERR_CERT_AUTHORITY_INVALID, which is what caused the "Your connection is not private" warning.
+    if use_https and os.path.exists(cert_path) and os.path.exists(key_path):
+        app.run(host='0.0.0.0', port=5000, debug=is_debug, ssl_context=(cert_path, key_path))
+    else:
+        app.run(host='0.0.0.0', port=5000, debug=is_debug)
