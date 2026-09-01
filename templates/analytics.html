@@ -13,8 +13,8 @@
             <a class="brand" href="/home"><span class="brand-mark">AI</span><span>Service<br><strong>Intelligence</strong></span></a>
             <nav>
                 <a href="/home"><span>⌂</span> Prediction</a>
+                <a href="/bulk_upload"><span>⇪</span> Bulk Review</a>
                 <a class="active" href="/analytics"><span>◫</span> Analytics</a>
-                <a href="/about"><span>i</span> About</a>
                 <a href="/notebook"><span>▤</span> Notebook</a>
             </nav>
             <div class="sidebar-footer">MODEL MONITOR<br><strong>Sentiment v1.0</strong><span class="online-dot"></span></div>
@@ -23,7 +23,10 @@
         <main class="analytics-main">
             <header class="dashboard-header">
                 <div><p class="eyebrow">INSIGHT CENTER / LIVE DATA</p><h1>Analytics Dashboard</h1><p class="subheading">A clear view of what your customers are saying.</p></div>
-                <a class="predict-link" href="/home">+ Analyze review</a>
+                <div style="display: flex; gap: 10px;">
+                    <a class="predict-link" href="/bulk_upload">📁 Bulk Upload</a>
+                    <a class="predict-link" href="/home">+ Analyze review</a>
+                </div>
             </header>
 
             <section class="metric-grid">
@@ -59,10 +62,10 @@
         const sentimentCounts = {{ sentiment_counts|safe }};
         const chartFont = { family: 'DM Sans, sans-serif' };
         const baseOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { padding: 10, cornerRadius: 8, titleFont: chartFont, bodyFont: chartFont } } };
-        new Chart(document.getElementById('sentimentChart'), { type: 'doughnut', data: { labels: sentimentLabels, datasets: [{ data: sentimentCounts, backgroundColor: ['#176b87', '#1f9d72', '#e4b44c', '#d98454', '#e56b5d', '#a84747'], borderWidth: 0, hoverOffset: 5 }] }, options: { ...baseOptions, cutout: '76%' } });
-        new Chart(document.getElementById('trendChart'), { type: 'line', data: { labels: trendRows.map(row => row.day), datasets: sentimentLabels.map((label, index) => ({ label, data: trendRows.map(row => row[label.toLowerCase().replace(' ', '_')]), borderColor: ['#176b87', '#1f9d72', '#e4b44c', '#d98454', '#e56b5d', '#a84747'][index], fill: false, tension: .35, pointRadius: 3 })) }, options: { ...baseOptions, scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 6, color: '#8994a5' } }, y: { beginAtZero: true, ticks: { precision: 0, color: '#8994a5' }, grid: { color: '#edf0f4' } } } } });
-        new Chart(document.getElementById('topicChart'), { type: 'bar', data: { labels: topicRows.map(row => row.topic), datasets: [{ data: topicRows.map(row => row.count), backgroundColor: '#3c6e9f', borderRadius: 5, barThickness: 16 }] }, options: { ...baseOptions, indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { precision: 0, color: '#8994a5' }, grid: { color: '#edf0f4' } }, y: { ticks: { color: '#4b596b' }, grid: { display: false } } } } });
-        new Chart(document.getElementById('topicSentimentChart'), { type: 'bar', data: { labels: topicSentimentRows.map(row => row.topic), datasets: sentimentLabels.map((label, index) => ({ label, data: topicSentimentRows.map(row => row[label.toLowerCase().replace(' ', '_')]), backgroundColor: ['#176b87', '#1f9d72', '#e4b44c', '#d98454', '#e56b5d', '#a84747'][index], borderRadius: 4 })) }, options: { ...baseOptions, scales: { x: { ticks: { color: '#8994a5' }, grid: { display: false } }, y: { beginAtZero: true, ticks: { precision: 0, color: '#8994a5' }, grid: { color: '#edf0f4' } } } } });
+        new Chart(document.getElementById('sentimentChart'), { type: 'doughnut', data: { labels: sentimentLabels, datasets: [{ data: sentimentCounts, backgroundColor: ['#8b5cf6', '#a855f7', '#c084fc', '#e9d5ff', '#ef4444', '#b91c1c'], borderWidth: 0, hoverOffset: 5 }] }, options: { ...baseOptions, cutout: '76%' } });
+        new Chart(document.getElementById('trendChart'), { type: 'line', data: { labels: trendRows.map(row => row.day), datasets: sentimentLabels.map((label, index) => ({ label, data: trendRows.map(row => row[label.toLowerCase().replace(' ', '_')]), borderColor: ['#8b5cf6', '#a855f7', '#c084fc', '#e9d5ff', '#ef4444', '#b91c1c'][index], fill: false, tension: .35, pointRadius: 3 })) }, options: { ...baseOptions, scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 6, color: '#a1a1aa' } }, y: { beginAtZero: true, ticks: { precision: 0, color: '#a1a1aa' }, grid: { color: '#27272a' } } } } });
+        new Chart(document.getElementById('topicChart'), { type: 'bar', data: { labels: topicRows.map(row => row.topic), datasets: [{ data: topicRows.map(row => row.count), backgroundColor: '#8b5cf6', borderRadius: 5, barThickness: 16 }] }, options: { ...baseOptions, indexAxis: 'y', scales: { x: { beginAtZero: true, ticks: { precision: 0, color: '#a1a1aa' }, grid: { color: '#27272a' } }, y: { ticks: { color: '#ffffff' }, grid: { display: false } } } } });
+        new Chart(document.getElementById('topicSentimentChart'), { type: 'bar', data: { labels: topicSentimentRows.map(row => row.topic), datasets: sentimentLabels.map((label, index) => ({ label, data: topicSentimentRows.map(row => row[label.toLowerCase().replace(' ', '_')]), backgroundColor: ['#8b5cf6', '#a855f7', '#c084fc', '#e9d5ff', '#ef4444', '#b91c1c'][index], borderRadius: 4 })) }, options: { ...baseOptions, scales: { x: { ticks: { color: '#a1a1aa' }, grid: { display: false } }, y: { beginAtZero: true, ticks: { precision: 0, color: '#a1a1aa' }, grid: { color: '#27272a' } } } } });
     </script>
 </body>
 </html>

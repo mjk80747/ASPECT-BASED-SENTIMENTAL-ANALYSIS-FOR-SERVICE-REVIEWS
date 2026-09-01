@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Export</title>
+    <style>
+        :root {
+            --bg-1: #0f0f0f;
+            --bg-2: #141414;
+            --panel: #171717;
+            --panel-strong: #171717;
+            --border: #27272a;
+            --text: #ffffff;
+            --muted: #a1a1aa;
+            --purple: #8b5cf6;
+            --purple-hover: #7c3aed;
+            --shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(139, 92, 246, 0.08);
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            min-height: 100vh;
+            color: var(--text);
+            background: radial-gradient(circle at top right, rgba(139, 92, 246, 0.12), transparent 45%), linear-gradient(135deg, #0f0f0f 0%, #141414 100%);
+        }
+        .wrap {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 32px 20px 50px;
+        }
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding: 18px 24px;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: var(--panel);
+            box-shadow: var(--shadow);
+        }
+        .title {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #ffffff;
+        }
+        .actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-weight: 700;
+            color: white;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn.primary { background: linear-gradient(135deg, #8b5cf6, #7c3aed); box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3); }
+        .btn.primary:hover { transform: translateY(-1px); }
+        .btn.secondary { background: linear-gradient(135deg, #a855f7, #8b5cf6); box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3); }
+        .btn.ghost { background: #1f1f1f; color: var(--muted); border: 1px solid var(--border); }
+        .btn.ghost:hover { background: #27272a; color: #ffffff; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .card {
+            position: relative;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            padding: 20px 18px;
+            overflow: hidden;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+        .card:hover { transform: translateY(-2px); border-color: var(--purple); }
+        .card::before {
+            content: "";
+            position: absolute;
+            inset: 0 auto auto 0;
+            width: 150px;
+            height: 150px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.15), transparent 70%);
+        }
+        .label {
+            position: relative;
+            color: var(--muted);
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06rem;
+            margin-bottom: 8px;
+        }
+        .value {
+            position: relative;
+            font-size: clamp(1.8rem, 2vw, 2.4rem);
+            font-weight: 800;
+            color: #ffffff;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            padding: 20px 22px;
+        }
+        .panel h3 {
+            margin: 0 0 14px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+        .legend {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--muted);
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .dot.blue { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+        .dot.green { background: linear-gradient(135deg, #a855f7, #8b5cf6); }
+        .dot.amber { background: linear-gradient(135deg, #c084fc, #a855f7); }
+        .bars {
+            display: flex;
+            align-items: end;
+            gap: 10px;
+            height: 150px;
+        }
+        .bar-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: end;
+            align-items: center;
+            gap: 8px;
+        }
+        .bar {
+            width: 100%;
+            min-height: 12px;
+            border-radius: 8px 8px 0 0;
+            background: linear-gradient(180deg, #8b5cf6, #6d28d9);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.35);
+        }
+        .bar.alt {
+            background: linear-gradient(180deg, #a855f7, #7c3aed);
+            box-shadow: 0 4px 12px rgba(168, 85, 247, 0.35);
+        }
+        .bar-label {
+            font-size: 0.75rem;
+            color: var(--muted);
+            font-weight: 600;
+        }
+        .sentiment-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .sentiment-row {
+            display: grid;
+            grid-template-columns: 110px 1fr 36px;
+            gap: 12px;
+            align-items: center;
+        }
+        .sentiment-row span {
+            color: var(--muted);
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+        .track {
+            width: 100%;
+            height: 11px;
+            border-radius: 999px;
+            background: #27272a;
+            overflow: hidden;
+        }
+        .fill {
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #8b5cf6, #a855f7);
+            box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+        }
+        .table-wrap {
+            margin-top: 24px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--panel);
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        th, td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid #27272a;
+        }
+        th {
+            background: #1f1f1f;
+            color: var(--purple);
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.06rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+        }
+        td {
+            color: #ffffff;
+            font-size: 0.92rem;
+        }
+        tr:hover td {
+            background: #1f1f1f;
+        }
+        .pill {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .pill.positive { background: rgba(139, 92, 246, 0.2); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.35); }
+        .pill.negative { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); }
+        .pill.neutral { background: rgba(168, 85, 247, 0.15); color: #e9d5ff; border: 1px solid rgba(168, 85, 247, 0.3); }
+        @media (max-width: 700px) {
+            .topbar { flex-direction: column; align-items: flex-start; }
+            .actions { width: 100%; }
+            .btn { flex: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="topbar">
+            <div class="title">Analytics Export</div>
+            <div class="actions">
+                <a class="btn ghost" href="{{ url_for('admin_dashboard') }}">Back to Dashboard</a>
+                <a class="btn primary" href="{{ url_for('export_analytics_csv') }}">Download CSV</a>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="card">
+                <div class="label">Total Users</div>
+                <div class="value">{{ total_users }}</div>
+            </div>
+            <div class="card">
+                <div class="label">Total Reviews</div>
+                <div class="value">{{ total_reviews }}</div>
+            </div>
+            <div class="card">
+                <div class="label">Positive</div>
+                <div class="value">{{ positive }}</div>
+            </div>
+            <div class="card">
+                <div class="label">Negative</div>
+                <div class="value">{{ negative }}</div>
+            </div>
+            <div class="card">
+                <div class="label">Neutral / Mixed</div>
+                <div class="value">{{ neutral }}</div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="panel">
+                <h3>Registration Trend</h3>
+                <div class="legend"><span class="dot blue"></span> New user signups</div>
+                <div class="bars">
+                    {% set max_reg = registration_rows | map(attribute='count') | list | max if registration_rows else 0 %}
+                    {% for row in registration_rows %}
+                    <div class="bar-col">
+                        <div class="bar" title="{{ row.date }}: {{ row.count }} registrations" style="height: {{ ((row.count / max_reg) * 100) if max_reg else 0 }}%"></div>
+                        <div class="bar-label">{{ row.date[-2:] }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Review Volume Trend</h3>
+                <div class="legend"><span class="dot green"></span> Review submissions</div>
+                <div class="bars">
+                    {% set max_rev = review_rows | map(attribute='count') | list | max if review_rows else 0 %}
+                    {% for row in review_rows %}
+                    <div class="bar-col">
+                        <div class="bar alt" title="{{ row.date }}: {{ row.count }} reviews" style="height: {{ ((row.count / max_rev) * 100) if max_rev else 0 }}%"></div>
+                        <div class="bar-label">{{ row.date[-2:] }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="panel" style="grid-column: 1 / -1;">
+                <h3>Sentiment Distribution</h3>
+                <div class="legend"><span class="dot amber"></span> Share of the analyzed reviews</div>
+                <div class="sentiment-list">
+                    {% set max_sent = sentiment_rows | map(attribute='count') | list | max if sentiment_rows else 0 %}
+                    {% for row in sentiment_rows %}
+                    <div class="sentiment-row" title="{{ row.label }}: {{ row.count }} reviews">
+                        <span>{{ row.label }}</span>
+                        <div class="track"><div class="fill" style="width: {{ ((row.count / max_sent) * 100) if max_sent else 0 }}%"></div></div>
+                        <span>{{ row.count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="table-wrap panel">
+            <h3>Latest Reviews</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Review</th>
+                        <th>Sentiment</th>
+                        <th>Topic</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in latest_reviews %}
+                    <tr>
+                        <td>{{ row['review_text'] }}</td>
+                        <td>
+                            {% set s = row['sentiment'] %}
+                            {% if s in ['Positive', 'Very Positive'] %}
+                                <span class="pill positive">{{ s }}</span>
+                            {% elif s in ['Negative', 'Very Negative'] %}
+                                <span class="pill negative">{{ s }}</span>
+                            {% else %}
+                                <span class="pill neutral">{{ s }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ row['topic'] }}</td>
+                        <td>{{ row['created_at'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

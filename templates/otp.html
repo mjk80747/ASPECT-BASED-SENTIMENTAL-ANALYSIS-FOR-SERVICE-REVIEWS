@@ -17,91 +17,106 @@
         }
 
         body {
-            background-color: #c9d6ff;
+            background: radial-gradient(circle at top right, rgba(139, 92, 246, 0.15), transparent 50%), linear-gradient(135deg, #0f0f0f 0%, #141414 100%);
             display: flex;
             align-items: center;
             justify-content: center;
             height: 100vh;
             margin: 0;
+            color: #ffffff;
         }
 
         .otp-container {
-            background-color: #fff;
-            border-radius: 12px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.35);
+            background-color: #171717;
+            border: 1px solid #27272a;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 25px rgba(139, 92, 246, 0.15);
             overflow: hidden;
-            width: 400px; /* Increased width */
-            padding: 40px; /* Increased padding */
+            width: 400px;
+            padding: 40px;
             text-align: center;
         }
 
         .otp-container h1 {
-            font-size: 28px; /* Increased font size */
-            margin-bottom: 20px; /* Increased margin */
-            color: #333;
+            font-size: 28px;
+            margin-bottom: 20px;
+            color: #ffffff;
         }
 
         .otp-container span {
-            font-size: 16px; /* Increased font size */
-            color: #555;
-            margin-bottom: 20px; /* Increased margin */
+            font-size: 15px;
+            color: #a1a1aa;
+            margin-bottom: 20px;
             display: block;
         }
 
         .otp-container .error {
-            color: #b42318;
+            color: #fca5a5;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 8px;
+            padding: 8px 12px;
             font-size: 14px;
             margin-bottom: 12px;
         }
 
         .otp-container input {
-            background-color: #eee;
-            border: 1px solid #ccc; /* Added border to input fields */
+            background-color: #1f1f1f;
+            border: 1px solid #27272a;
+            color: #ffffff;
             margin: 15px 0;
-            padding: 12px 18px; /* Increased padding */
-            font-size: 16px; /* Increased font size */
-            border-radius: 8px;
+            padding: 12px 18px;
+            font-size: 16px;
+            border-radius: 10px;
             width: 100%;
             outline: none;
-            transition: border-color 0.3s;
+            transition: all 0.3s;
         }
 
         .otp-container input:focus {
-            border-color: #ffa500; /* Added focus effect */
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
         }
 
         .otp-container button {
-            background-color: orange;
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
             color: #fff;
-            font-size: 16px; /* Increased font size */
-            padding: 12px 25px; /* Increased padding */
+            font-size: 15px;
+            padding: 12px 25px;
             border: 1px solid transparent;
-            border-radius: 8px;
+            border-radius: 10px;
             font-weight: 600;
             letter-spacing: 0.5px;
             text-transform: uppercase;
             cursor: pointer;
-            transition: background-color 0.3s;
-            margin-top: 20px; /* Added margin */
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+            transition: all 0.3s;
+            margin-top: 20px;
+            width: 100%;
         }
 
         .otp-container button:hover {
-            background-color: #ff8c00;
+            background: linear-gradient(135deg, #9353d3, #8b5cf6);
+            transform: translateY(-1px);
         }
 
         .otp-container .resend-btn {
-            background-color: #ddd;
-            color: #333;
+            background: #1f1f1f;
+            border: 1px solid #27272a;
+            color: #a1a1aa;
             margin-top: 15px;
+            box-shadow: none;
         }
 
         .otp-container .resend-btn:hover {
-            background-color: #ccc;
+            background: #27272a;
+            color: #ffffff;
         }
 
         .otp-container .no-receive {
             margin-top: 20px;
-            font-size: 14px; /* Increased font size */
+            font-size: 14px;
+            color: #a1a1aa;
         }
 
         .otp-container .no-receive a {

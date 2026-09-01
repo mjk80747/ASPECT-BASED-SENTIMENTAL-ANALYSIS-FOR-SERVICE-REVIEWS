@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Review Processing - Aspect-Based Sentiment Analysis</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'DM Sans', sans-serif;
+            background: radial-gradient(circle at top right, rgba(139, 92, 246, 0.12), transparent 45%), linear-gradient(135deg, #0f0f0f 0%, #141414 100%);
+            color: #ffffff;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: #171717;
+            padding: 18px 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #27272a;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+        .header-brand {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #ffffff;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .header-brand i {
+            color: #8b5cf6;
+            font-size: 1.4rem;
+        }
+        .header-nav {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .header-nav a {
+            color: #a1a1aa;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.92rem;
+            transition: color 0.2s ease;
+        }
+        .header-nav a:hover, .header-nav a.active {
+            color: #ffffff;
+        }
+        .btn-nav-primary {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            color: #ffffff !important;
+            padding: 8px 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        .container {
+            width: min(92vw, 1200px);
+            margin: 40px auto;
+            padding: 0 10px;
+        }
+
+        .title-block {
+            text-align: center;
+            margin-bottom: 36px;
+        }
+        .eyebrow {
+            color: #8b5cf6;
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.1rem;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .title-block h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.3rem;
+            font-weight: 800;
+            margin: 0 0 10px;
+        }
+        .title-block p {
+            color: #a1a1aa;
+            font-size: 1rem;
+            max-width: 620px;
+            margin: 0 auto;
+        }
+
+        .dropzone-card {
+            background: #171717;
+            border: 2px dashed #27272a;
+            border-radius: 20px;
+            padding: 48px 32px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+        .dropzone-card:hover, .dropzone-card.drag-over {
+            border-color: #8b5cf6;
+            background: rgba(139, 92, 246, 0.05);
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.15);
+        }
+        .drop-icon {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: rgba(139, 92, 246, 0.15);
+            color: #8b5cf6;
+            display: grid;
+            place-items: center;
+            margin: 0 auto 20px;
+            font-size: 1.8rem;
+            transition: transform 0.2s ease;
+        }
+        .dropzone-card:hover .drop-icon {
+            transform: scale(1.1);
+        }
+        .drop-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .drop-hint {
+            color: #a1a1aa;
+            font-size: 0.92rem;
+            margin-bottom: 24px;
+        }
+        .drop-hint code {
+            background: #1f1f1f;
+            color: #c084fc;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+        
+        .file-input {
+            display: none;
+        }
+
+        .btn-upload {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            color: #ffffff;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(139, 92, 246, 0.35);
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-upload:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(139, 92, 246, 0.5);
+        }
+
+        .sample-bar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            margin-top: 20px;
+            color: #a1a1aa;
+            font-size: 0.88rem;
+        }
+        .sample-bar a {
+            color: #8b5cf6;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .sample-bar a:hover {
+            text-decoration: underline;
+        }
+
+        .error-msg {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+            padding: 14px 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Results Dashboard */
+        .results-section {
+            margin-top: 48px;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 18px;
+            margin-bottom: 30px;
+        }
+        .summary-card {
+            background: #171717;
+            border: 1px solid #27272a;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        .summary-card .label {
+            color: #a1a1aa;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .summary-card .val {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: #ffffff;
+        }
+        .summary-card.positive .val { color: #8b5cf6; }
+        .summary-card.negative .val { color: #ef4444; }
+        .summary-card.neutral .val { color: #c084fc; }
+
+        .export-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .export-actions h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.4rem;
+            margin: 0;
+        }
+        .export-btns {
+            display: flex;
+            gap: 10px;
+        }
+        .btn-export {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 18px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.88rem;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s ease;
+        }
+        .btn-csv {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+        .btn-excel {
+            background: #1f1f1f;
+            color: #a1a1aa;
+            border: 1px solid #27272a;
+        }
+        .btn-excel:hover {
+            background: #27272a;
+            color: #ffffff;
+        }
+
+        .table-card {
+            background: #171717;
+            border: 1px solid #27272a;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            margin-bottom: 40px;
+        }
+        .table-responsive {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+        th, td {
+            padding: 14px 18px;
+            border-bottom: 1px solid #27272a;
+            vertical-align: middle;
+        }
+        th {
+            background: #1f1f1f;
+            color: #8b5cf6;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05rem;
+        }
+        td {
+            font-size: 0.92rem;
+            color: #ffffff;
+        }
+        tr:hover td {
+            background: #1f1f1f;
+        }
+
+        .badge-sentiment {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .badge-Very-Positive, .badge-Positive { background: rgba(139, 92, 246, 0.2); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.4); }
+        .badge-Neutral, .badge-Mixed { background: rgba(192, 132, 252, 0.15); color: #e9d5ff; border: 1px solid rgba(192, 132, 252, 0.3); }
+        .badge-Negative, .badge-Very-Negative { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
+
+        .aspect-pill {
+            display: inline-block;
+            background: #1f1f1f;
+            border: 1px solid #27272a;
+            color: #a1a1aa;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            margin: 2px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <a href="{{ url_for('index') }}" class="header-brand">
+            <i class="fa-solid fa-chart-line"></i> Aspect Sentiment AI
+        </a>
+        <nav class="header-nav">
+            <a href="/home">Prediction</a>
+            <a href="/bulk_upload" class="active">Bulk Review</a>
+            <a href="/analytics">Analytics</a>
+            <a href="/notebook">Notebook</a>
+            <a href="{{ url_for('admin_dashboard') }}" class="btn-nav-primary">Admin Dashboard</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        
+        <div class="title-block">
+            <div class="eyebrow">Enterprise Batch Processing</div>
+            <h1>Bulk Review CSV / Excel Upload</h1>
+            <p>Upload files containing customer reviews from Google, Yelp, or TripAdvisor to perform instant batch aspect extraction & sentiment analysis.</p>
+        </div>
+
+        {% if error_msg %}
+        <div class="error-msg">
+            <i class="fa-solid fa-circle-exclamation"></i> {{ error_msg }}
+        </div>
+        {% endif %}
+
+        <form id="uploadForm" method="post" action="{{ url_for('bulk_upload') }}" enctype="multipart/form-data">
+            <div class="dropzone-card" id="dropzone">
+                <input type="file" name="file" id="fileInput" class="file-input" accept=".csv, .xlsx, .xls" required>
+                <div class="drop-icon">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                </div>
+                <div class="drop-title" id="dropTitle">Drag & Drop your file here</div>
+                <div class="drop-hint">Supports <code>.csv</code>, <code>.xlsx</code>, <code>.xls</code> (Auto-detects review column)</div>
+                <button type="button" class="btn-upload" onclick="document.getElementById('fileInput').click();">
+                    <i class="fa-solid fa-folder-open"></i> Browse File
+                </button>
+            </div>
+        </form>
+
+        <div class="sample-bar">
+            <span>Need a sample file to test?</span>
+            <a href="{{ url_for('download_sample_template') }}"><i class="fa-solid fa-download"></i> Download Sample CSV Template</a>
+        </div>
+
+        {% if results %}
+        <div class="results-section">
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <div class="label">Total Processed</div>
+                    <div class="val">{{ total_count }}</div>
+                </div>
+                <div class="summary-card positive">
+                    <div class="label">Positive Sentiment</div>
+                    <div class="val">{{ positive_pct }}%</div>
+                </div>
+                <div class="summary-card negative">
+                    <div class="label">Negative Sentiment</div>
+                    <div class="val">{{ negative_pct }}%</div>
+                </div>
+                <div class="summary-card neutral">
+                    <div class="label">Neutral / Mixed</div>
+                    <div class="val">{{ neutral_pct }}%</div>
+                </div>
+            </div>
+
+            <div class="export-actions">
+                <h2>Batch Analysis Results</h2>
+                <div class="export-btns">
+                    <a href="{{ url_for('download_bulk_export', format='csv') }}" class="btn-export btn-csv">
+                        <i class="fa-solid fa-file-csv"></i> Download CSV Export
+                    </a>
+                    <a href="{{ url_for('download_bulk_export', format='excel') }}" class="btn-export btn-excel">
+                        <i class="fa-solid fa-file-excel"></i> Download Excel Export
+                    </a>
+                </div>
+            </div>
+
+            <div class="table-card">
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Review Text</th>
+                                <th>Sentiment</th>
+                                <th>Aspects Identified</th>
+                                <th>Topic</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in results %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>{{ item.review_text }}</td>
+                                <td>
+                                    <span class="badge-sentiment badge-{{ item.sentiment.replace(' ', '-') }}">
+                                        {{ item.sentiment }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if item.aspects %}
+                                        {% for aspect in item.aspects %}
+                                            <span class="aspect-pill">{{ aspect }}</span>
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="aspect-pill">General</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.topic }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <script>
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const dropTitle = document.getElementById('dropTitle');
+        const uploadForm = document.getElementById('uploadForm');
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('drag-over');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('drag-over');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelected();
+            }
+        });
+
+        fileInput.addEventListener('change', handleFileSelected);
+
+        function handleFileSelected() {
+            if (fileInput.files.length) {
+                const fileName = fileInput.files[0].name;
+                dropTitle.textContent = `Selected: ${fileName}`;
+                uploadForm.submit();
+            }
+        }
+    </script>
+</body>
+</html>

@@ -20,8 +20,8 @@
 }
 
 body {
-    background-color: #c9d6ff;
-    background: linear-gradient(to right, #e2e2e2, #c9d6ff);
+    background: radial-gradient(circle at top right, rgba(139, 92, 246, 0.15), transparent 50%), linear-gradient(135deg, #0f0f0f 0%, #141414 100%);
+    color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -30,9 +30,10 @@ body {
 }
 
 .container {
-    background-color: #fff;
+    background-color: #171717;
+    border: 1px solid #27272a;
     border-radius: 30px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 25px rgba(139, 92, 246, 0.15);
     position: relative;
     overflow: hidden;
     width: 768px;
@@ -40,29 +41,40 @@ body {
     min-height: 480px;
 }
 
+.container h1 {
+    color: #ffffff;
+}
+
 .container p {
     font-size: 14px;
     line-height: 20px;
     letter-spacing: 0.3px;
     margin: 20px 0;
+    color: #a1a1aa;
 }
 
 .container span {
     font-size: 12px;
+    color: #a1a1aa;
 }
 
 .container a {
-    color: #333;
+    color: #c084fc;
     font-size: 13px;
     text-decoration: none;
     margin: 15px 0 10px;
+    transition: color 0.2s ease;
+}
+
+.container a:hover {
+    color: #ffffff;
 }
 
 .container button {
-    background-color: orange;
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
     color: #fff;
     font-size: 12px;
-    padding: 10px 45px;
+    padding: 12px 45px;
     border: 1px solid transparent;
     border-radius: 8px;
     font-weight: 600;
@@ -70,19 +82,24 @@ body {
     text-transform: uppercase;
     margin-top: 10px;
     cursor: pointer;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+    transition: all 0.2s ease;
 }
 
 .container button:hover {
-    background-color: #00a1ff;
+    background: linear-gradient(135deg, #9353d3, #8b5cf6);
+    transform: translateY(-1px);
 }
 
 .container button.hidden {
     background-color: transparent;
-    border-color: #fff;
+    border-color: #ffffff;
+    color: #ffffff;
+    box-shadow: none;
 }
 
 .container form {
-    background-color: #fff;
+    background-color: #171717;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -92,14 +109,21 @@ body {
 }
 
 .container input {
-    background-color: #eee;
-    border: none;
+    background-color: #1f1f1f;
+    border: 1px solid #27272a;
+    color: #ffffff;
     margin: 8px 0;
     padding: 10px 15px;
     font-size: 13px;
     border-radius: 8px;
     width: 100%;
     outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.container input:focus {
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
 }
 
 .signup-error {
@@ -107,10 +131,10 @@ body {
     width: 100%;
     margin: 4px 0 8px;
     padding: 9px 12px;
-    border-left: 4px solid #c33764;
+    border-left: 4px solid #ef4444;
     border-radius: 6px;
-    background: #fff1f4;
-    color: #a32148;
+    background: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
     font-size: 12px;
     line-height: 1.4;
 }
@@ -128,50 +152,63 @@ body {
     padding-right: 35px; /* space for the icon */
 }
 
-.password-container .eye-icon {
+.password-container .eye-icon,
+.container .password-container button.eye-icon {
     position: absolute;
     right: 10px;
     top: 50%;
     transform: translateY(-50%);
     cursor: pointer;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: #64748b;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
     line-height: 1;
-    margin: 0;
+    margin: 0 !important;
     width: 28px;
     height: 28px;
     display: grid;
     place-items: center;
-    transition: color 180ms ease, transform 180ms ease;
-}
-
-.password-container .eye-icon i {
+    border-radius: 0 !important;
     transition: transform 180ms ease;
 }
 
-.password-container .eye-icon:hover {
-    color: #0f5f8c;
-    transform: translateY(-50%) scale(1.08);
+.password-container .eye-icon i,
+.container .password-container button.eye-icon i {
+    color: #a1a1aa;
+    font-size: 15px;
+    transition: color 180ms ease, transform 180ms ease;
 }
 
-.password-container .eye-icon:active {
+.password-container .eye-icon:hover,
+.container .password-container button.eye-icon:hover {
+    background: transparent !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    transform: translateY(-50%) scale(1.12);
+}
+
+.password-container .eye-icon:hover i,
+.container .password-container button.eye-icon:hover i {
+    color: #ffffff;
+}
+
+.password-container .eye-icon:active,
+.container .password-container button.eye-icon:active {
     transform: translateY(-50%) scale(0.94);
 }
 
-.password-container .eye-icon.is-visible {
-    color: #0f5f8c;
-}
-
-.password-container .eye-icon.is-visible i {
+.password-container .eye-icon.is-visible i,
+.container .password-container button.eye-icon.is-visible i {
     transform: rotate(-8deg);
 }
 
-.password-container .eye-icon:focus-visible {
-    outline: 2px solid #00a1ff;
+.password-container .eye-icon:focus-visible,
+.container .password-container button.eye-icon:focus-visible {
+    outline: 2px solid #8b5cf6;
     outline-offset: 2px;
-    border-radius: 50%;
+    border-radius: 50% !important;
 }
 
 .form-container {
@@ -224,7 +261,9 @@ body {
 }
 
 .social-icons a {
-    border: 1px solid #ccc;
+    border: 1px solid #27272a;
+    background: #1f1f1f;
+    color: #c084fc;
     border-radius: 20%;
     display: inline-flex;
     justify-content: center;
@@ -232,6 +271,13 @@ body {
     margin: 0 3px;
     width: 40px;
     height: 40px;
+    transition: all 0.2s ease;
+}
+
+.social-icons a:hover {
+    background: #8b5cf6;
+    color: #ffffff;
+    border-color: #8b5cf6;
 }
 
 .toggle-container {
@@ -252,13 +298,11 @@ body {
 }
 
 .toggle {
-    background-color: linear-gradient(to left, #00a1ff, #00ff8f);
+    background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 50%, #4c1d95 100%);
     height: 100%;
-    background: linear-gradient(to right, #c33764, #1d2671);
     color: #fff;
     position: relative;
     left: -100%;
-    height: 100%;
     width: 200%;
     transform: translateX(0);
     transition: all 0.6s ease-in-out;
@@ -313,7 +357,6 @@ body {
                 </div>
                 <span>or use your email for registration</span>
                 <input type="text" name="user" placeholder="Username">
-                <input type="text" name="name" placeholder="Name">
                 <input type="email" name="email" placeholder="Email" pattern="[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$" required oninvalid="this.setCustomValidity('Enter a valid email address, for example name@example.com.')" oninput="this.setCustomValidity('')">
                 <input type="tel" name="mobile" placeholder="Phone Number" pattern="[6-9]{1}[0-9]{9}" required oninvalid="this.setCustomValidity('Enter a 10-digit phone number starting with 6, 7, 8, or 9.')" oninput="this.setCustomValidity('')">
                 <div class="password-container">

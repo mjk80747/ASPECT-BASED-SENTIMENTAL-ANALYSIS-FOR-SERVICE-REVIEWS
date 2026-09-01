@@ -105,92 +105,85 @@
  * ------------------------------------------------------------------- */
 :root {
 
-    /* color-1(#d9083c)
-     * color-2(#eb5e55)
-     * color-3(#f2d0a4)
+    /* theme colors
      */
-    --color-1: hsla(345, 93%, 44%, 1);
-    --color-2: hsla(4, 79%, 63%, 1);
-    --color-3: hsla(34, 75%, 80%, 1);
+    --color-1: #8b5cf6;
+    --color-2: #a855f7;
+    --color-3: #c084fc;
 
     /* theme color variations
      */
-    --color-1-lighter: hsla(345, 93%, 64%, 1);
-    --color-1-light  : hsla(345, 93%, 54%, 1);
-    --color-1-dark   : hsla(345, 93%, 34%, 1);
-    --color-1-darker : hsla(345, 93%, 24%, 1);
-    --color-2-lighter: hsla(4, 79%, 83%, 1);
-    --color-2-light  : hsla(4, 79%, 73%, 1);
-    --color-2-dark   : hsla(4, 79%, 53%, 1);
-    --color-2-darker : hsla(4, 79%, 43%, 1);
+    --color-1-lighter: #c084fc;
+    --color-1-light  : #a855f7;
+    --color-1-dark   : #7c3aed;
+    --color-1-darker : #6d28d9;
+    --color-2-lighter: #e9d5ff;
+    --color-2-light  : #c084fc;
+    --color-2-dark   : #7c3aed;
+    --color-2-darker : #6d28d9;
 
     /* feedback colors
-     * color-error(#ffd1d2), color-success(#c8e675), 
-     * color-info(#d7ecfb), color-notice(#fff099)
      */
-    --color-error          : hsla(359, 100%, 91%, 1);
-    --color-success        : hsla(76, 69%, 68%, 1);
-    --color-info           : hsla(205, 82%, 91%, 1);
-    --color-notice         : hsla(51, 100%, 80%, 1);
-    --color-error-content  : hsla(359, 50%, 50%, 1);
-    --color-success-content: hsla(76, 29%, 28%, 1);
-    --color-info-content   : hsla(205, 32%, 31%, 1);
-    --color-notice-content : hsla(51, 30%, 30%, 1);
+    --color-error          : #ef4444;
+    --color-success        : #8b5cf6;
+    --color-info           : #a855f7;
+    --color-notice         : #c084fc;
+    --color-error-content  : #ffffff;
+    --color-success-content: #ffffff;
+    --color-info-content   : #ffffff;
+    --color-notice-content : #ffffff;
 
-    /* shades 
-     * generated using 
-     * Tint & Shade Generator 
-     * (https://maketintsandshades.com/)
+    /* shades
      */
     --color-black  : #000000;
-    --color-gray-19: #0b0b0c;
-    --color-gray-18: #161719;
-    --color-gray-17: #202225;
-    --color-gray-16: #2b2e32;
-    --color-gray-15: #363a3f;
-    --color-gray-14: #41454b;
-    --color-gray-13: #4c5158;
-    --color-gray-12: #565c64;
-    --color-gray-11: #616871;
-    --color-gray-10: #6c737d;
-    --color-gray-9 : #7b818a;
-    --color-gray-8 : #898f97;
-    --color-gray-7 : #989da4;
-    --color-gray-6 : #a7abb1;
-    --color-gray-5 : #b6b9be;
-    --color-gray-4 : #c4c7cb;
-    --color-gray-3 : #d3d5d8;
-    --color-gray-2 : #e2e3e5;
-    --color-gray-1 : #f0f1f2;
+    --color-gray-19: #0f0f0f;
+    --color-gray-18: #141414;
+    --color-gray-17: #171717;
+    --color-gray-16: #1f1f1f;
+    --color-gray-15: #27272a;
+    --color-gray-14: #3f3f46;
+    --color-gray-13: #52525b;
+    --color-gray-12: #71717a;
+    --color-gray-11: #a1a1aa;
+    --color-gray-10: #d4d4d8;
+    --color-gray-9 : #e4e4e7;
+    --color-gray-8 : #f4f4f5;
+    --color-gray-7 : #f9f9fb;
+    --color-gray-6 : #ffffff;
+    --color-gray-5 : #ffffff;
+    --color-gray-4 : #ffffff;
+    --color-gray-3 : #ffffff;
+    --color-gray-2 : #ffffff;
+    --color-gray-1 : #ffffff;
     --color-white  : #ffffff;
 
     /* text
      */
-    --color-text       : var(--color-gray-10);
-    --color-text-dark  : var(--color-white);
-    --color-text-light : var(--color-gray-12);
-    --color-placeholder: var(--color-gray-11);
+    --color-text       : #ffffff;
+    --color-text-dark  : #ffffff;
+    --color-text-light : #a1a1aa;
+    --color-placeholder: #71717a;
 
     /* buttons
      */
-    --color-btn                   : var(--color-gray-15);
-    --color-btn-text              : var(--color-white);
-    --color-btn-hover             : var(--color-white);
-    --color-btn-hover-text        : var(--color-black);
-    --color-btn-primary           : var(--color-1);
-    --color-btn-primary-text      : var(--color-white);
-    --color-btn-primary-hover     : var(--color-white);
-    --color-btn-primary-hover-text: var(--color-black);
-    --color-btn-stroke            : var(--color-white);
-    --color-btn-stroke-text       : var(--color-white);
-    --color-btn-stroke-hover      : var(--color-white);
-    --color-btn-stroke-hover-text : var(--color-black);
+    --color-btn                   : #8b5cf6;
+    --color-btn-text              : #ffffff;
+    --color-btn-hover             : #7c3aed;
+    --color-btn-hover-text        : #ffffff;
+    --color-btn-primary           : #8b5cf6;
+    --color-btn-primary-text      : #ffffff;
+    --color-btn-primary-hover     : #7c3aed;
+    --color-btn-primary-hover-text: #ffffff;
+    --color-btn-stroke            : #8b5cf6;
+    --color-btn-stroke-text       : #ffffff;
+    --color-btn-stroke-hover      : #7c3aed;
+    --color-btn-stroke-hover-text : #ffffff;
 
     /* others
      */
-    --color-body  : var(--color-1);
-    --color-bg    : #14171B;
-    --color-border: var(--color-gray-17);
+    --color-body  : #0f0f0f;
+    --color-bg    : #0f0f0f;
+    --color-border: #27272a;
 }
 
 
