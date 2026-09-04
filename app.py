@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, Response
+from flask import Flask, render_template, request, redirect, url_for, session, Response, current_app
 import csv
 import json
 from io import BytesIO, StringIO
@@ -15,6 +15,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timezone, timedelta
 from functools import wraps
 import logging
+import tempfile
+import uuid
 import nltk
 
 from dotenv import load_dotenv
@@ -48,17 +50,97 @@ import pickle
 import joblib
 import re
 
-app = Flask(__name__)
-app.config.update(
-    SECRET_KEY=os.environ.get("SECRET_KEY", os.urandom(32).hex()),
-    MAX_CONTENT_LENGTH=5 * 1024 * 1024,  # 5 MB max upload limit
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SECURE=os.environ.get("FLASK_ENV") == "production",
-    SESSION_COOKIE_SAMESITE="Lax",
-    PERMANENT_SESSION_LIFETIME=timedelta(minutes=30),
-)
+class Config:
+    SECRET_KEY = os.environ.get("SECRET_KEY", os.urandom(32).hex())
+    MAX_CONTENT_LENGTH = 5 * 1024 * 1024
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SECURE = os.environ.get("FLASK_ENV") == "production"
+    SESSION_COOKIE_SAMESITE = "Lax"
+    PERMANENT_SESSION_LIFETIME = timedelta(minutes=30)
+    DATABASE = os.environ.get("DATABASE_PATH", "signup.db")
+    WTF_CSRF_ENABLED = True
 
-csrf = CSRFProtect(app)
+
+class DevelopmentConfig(Config):
+    DEBUG = True
+
+
+class TestingConfig(Config):
+    TESTING = True
+    WTF_CSRF_ENABLED = False
+    DATABASE = os.environ.get("TEST_DATABASE_URI")
+
+
+class ProductionConfig(Config):
+    DEBUG = False
+    SESSION_COOKIE_SECURE = True
+
+
+config_by_name = {
+    "development": DevelopmentConfig,
+    "testing": TestingConfig,
+    "production": ProductionConfig,
+    "default": DevelopmentConfig,
+}
+
+
+def create_app(config_name=None):
+    """Create a Flask app configured for development, testing, or production."""
+    app = Flask(__name__)
+    chosen = config_by_name.get(config_name or os.environ.get("FLASK_ENV", "development"), DevelopmentConfig)
+    app.config.from_object(chosen)
+
+    if config_name == "testing" and not app.config.get("DATABASE"):
+        fd, path = tempfile.mkstemp(prefix="sentiment_testing_", suffix=".db")
+        os.close(fd)
+        app.config["DATABASE"] = path
+    else:
+        app.config.setdefault("DATABASE", os.environ.get("DATABASE_PATH", "signup.db"))
+
+    csrf.init_app(app)
+    login_manager.init_app(app)
+    limiter.init_app(app)
+
+    @app.after_request
+    def add_security_headers(response):
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; "
+            "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
+            "img-src 'self' data:;"
+        )
+        return response
+
+    with app.app_context():
+        init_analytics_db(app.config["DATABASE"])
+        ensure_default_admin(app.config["DATABASE"])
+
+    register_routes(app)
+    globals()["app"] = app
+    return app
+
+
+def get_database_path(database_path=None):
+    if database_path:
+        return database_path
+    try:
+        return current_app.config.get("DATABASE", os.environ.get("DATABASE_PATH", "signup.db"))
+    except RuntimeError:
+        return os.environ.get("DATABASE_PATH", "signup.db")
+
+
+def connect_db(database_path=None):
+    target = get_database_path(database_path)
+    conn = sqlite3.connect(target, uri=target.startswith("file:"))
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+csrf = CSRFProtect()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -66,19 +148,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("security")
 
-@app.after_request
-def add_security_headers(response):
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; "
-        "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
-        "img-src 'self' data:;"
-    )
-    return response
 
 class User(UserMixin):
     def __init__(self, id, user, name, email, mobile, role):
@@ -90,13 +159,11 @@ class User(UserMixin):
         self.role = role
 
 login_manager = LoginManager()
-login_manager.init_app(app)
 login_manager.login_view = 'signin'
 
 @login_manager.user_loader
 def load_user(user_id):
-    con = sqlite3.connect('signup.db')
-    con.row_factory = sqlite3.Row
+    con = connect_db()
     row = con.execute("SELECT id, user, name, email, mobile, role FROM info WHERE id = ?", (user_id,)).fetchone()
     con.close()
     if row:
@@ -113,7 +180,6 @@ def admin_required(f):
 
 limiter = Limiter(
     get_remote_address,
-    app=app,
     default_limits=[],
     storage_uri="memory://"
 )
@@ -133,8 +199,9 @@ def validate_strong_password(password):
         return "Password must contain at least one number."
     return None
 
-def init_analytics_db():
-    con = sqlite3.connect('signup.db')
+def init_analytics_db(database_path=None):
+    target_db = get_database_path(database_path)
+    con = sqlite3.connect(target_db, uri=target_db.startswith("file:"))
     con.execute('''
         CREATE TABLE IF NOT EXISTS analyzed_reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -158,6 +225,19 @@ def init_analytics_db():
             mobile TEXT,
             password TEXT,
             role TEXT DEFAULT 'user',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    con.execute('''
+        CREATE TABLE IF NOT EXISTS admin_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user TEXT NOT NULL UNIQUE,
+            name TEXT,
+            email TEXT,
+            mobile TEXT,
+            password TEXT,
+            role TEXT DEFAULT 'admin',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -196,8 +276,10 @@ def init_analytics_db():
     con.commit()
     con.close()
 
-def ensure_default_admin():
-    con = sqlite3.connect('signup.db')
+
+def ensure_default_admin(database_path=None):
+    target_db = get_database_path(database_path)
+    con = sqlite3.connect(target_db, uri=target_db.startswith("file:"))
     cur = con.cursor()
     cur.execute("SELECT id, password FROM info WHERE user = ?", ('admin',))
     existing = cur.fetchone()
@@ -212,15 +294,26 @@ def ensure_default_admin():
         if admin_pass and not (admin_pass.startswith('scrypt:') or admin_pass.startswith('pbkdf2:') or admin_pass.startswith('argon2:')):
             hashed_pass = generate_password_hash(admin_pass)
             cur.execute("UPDATE info SET password = ? WHERE id = ?", (hashed_pass, existing[0]))
+
+    cur.execute("SELECT id FROM admin_users WHERE user = ?", ('admin',))
+    if not cur.fetchone():
+        cur.execute(
+            "INSERT INTO admin_users (user, name, email, mobile, password, role) VALUES (?, ?, ?, ?, ?, ?)",
+            ('admin', 'Administrator', 'admin@service.com', '0000000000', generate_password_hash('admin123'), 'admin')
+        )
+
     con.commit()
     con.close()
 
+
+# Keep the default runtime database consistent with the original single-file app.
 init_analytics_db()
 ensure_default_admin()
 
 
-cv = pickle.load(open('model.pickle','rb')) 
-model = joblib.load('model.sav')
+base_dir = os.path.dirname(os.path.abspath(__file__))
+cv = pickle.load(open(os.path.join(base_dir, 'model.pickle'), 'rb'))
+model = joblib.load(os.path.join(base_dir, 'model.sav'))
 
 SENTIMENT_LABELS = [
     'Very Negative',
@@ -301,28 +394,26 @@ def extract_aspects(message):
             detected.append(aspect)
     return detected
 
-@app.route("/")
 def index():
     return render_template("index.html")
 
-@app.route("/home")
+
 def home():
     return render_template("home.html")
 
-@app.route('/about')
+
 def about():
     return render_template('about.html')
 
-@app.route('/logon')
+
 def logon():
-	return render_template('signin.html')
+    return render_template('signin.html')
 
-@app.route('/login')
+
 def login():
-	return render_template('signin.html')
+    return render_template('signin.html')
 
 
-@app.route('/predict', methods=['GET', 'POST'])
 def upload():
     if request.method == 'GET':
         return render_template('home.html')
@@ -348,7 +439,7 @@ def upload():
     pred = f"{sentiment} Review, Based on the Input Message!"
 
     detected_topic = ', '.join(word) if word else 'Uncategorized'
-    con = sqlite3.connect('signup.db')
+    con = connect_db()
     con.execute(
         'INSERT INTO analyzed_reviews (review_text, sentiment, topic, aspects) VALUES (?, ?, ?, ?)',
         (message, sentiment, detected_topic, json.dumps(aspects)),
@@ -362,9 +453,8 @@ def upload():
     )
 
 
-@app.route('/analytics')
 def analytics():
-    con = sqlite3.connect('signup.db')
+    con = connect_db()
     con.row_factory = sqlite3.Row
     total = con.execute('SELECT COUNT(*) FROM analyzed_reviews').fetchone()[0]
     sentiment_rows = con.execute(
@@ -433,7 +523,6 @@ def analytics():
     )
 
 
-@app.route("/signup")
 @limiter.limit("3 per 5 minutes")
 def signup():
     username = request.args.get('user', '').strip()
@@ -448,7 +537,7 @@ def signup():
     if pwd_err:
         return render_template("signin.html", error=pwd_err)
 
-    con = sqlite3.connect('signup.db')
+    con = connect_db()
     cur = con.cursor()
     cur.execute("SELECT id FROM info WHERE LOWER(user) = LOWER(?) OR LOWER(email) = LOWER(?)", (username, email))
     if cur.fetchone():
@@ -505,7 +594,6 @@ def signup():
     return render_template("otp.html")
 
 
-@app.route('/otp', methods=['POST'])
 def otp():
     pending = session.get('pending_signup')
     if not pending:
@@ -519,7 +607,7 @@ def otp():
         return render_template("signin.html", error="OTP has expired. Please try signing up again.")
 
     if user_otp.isdigit() and int(user_otp) == pending.get('otp'):
-        con = sqlite3.connect('signup.db')
+        con = connect_db()
         cur = con.cursor()
         try:
             cur.execute(
@@ -538,7 +626,6 @@ def otp():
     return render_template("otp.html", error="Invalid OTP. Please try again.")
 
 
-@app.route("/signin", methods=['GET', 'POST'])
 @limiter.limit("10 per minute")
 def signin():
     if request.method == 'POST':
@@ -554,7 +641,7 @@ def signin():
     if not login_input or not password_input:
         return render_template("signin.html", error='Please provide both username/email and password.')
 
-    con = sqlite3.connect('signup.db')
+    con = connect_db()
     con.row_factory = sqlite3.Row
     row = con.execute(
         "SELECT id, user, name, email, mobile, password, role FROM info WHERE LOWER(user) = LOWER(?) OR LOWER(email) = LOWER(?)",
@@ -577,14 +664,13 @@ def signin():
     return render_template("signin.html", error='Invalid username/email or password.')
 
 
-@app.route('/admin/login', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
 def admin_login():
     if request.method == 'POST':
         login_input = request.form.get('username', '').strip()
         password_input = request.form.get('password', '').strip()
 
-        con = sqlite3.connect('signup.db')
+        con = connect_db()
         con.row_factory = sqlite3.Row
         row = con.execute(
             "SELECT id, user, name, email, mobile, password, role FROM info WHERE (LOWER(user) = LOWER(?) OR LOWER(email) = LOWER(?)) AND role = 'admin'",
@@ -607,15 +693,14 @@ def admin_login():
     return render_template('admin_login.html')
 
 
-@app.route('/admin')
 def admin_dashboard():
     if session.get('role') != 'admin':
-        return redirect(url_for('admin_login'))
+        return redirect('/admin/login')
 
     search = request.args.get('search', '').strip()
     role_filter = request.args.get('role', 'all').strip()
 
-    con = sqlite3.connect('signup.db')
+    con = connect_db()
     con.row_factory = sqlite3.Row
 
     query = "SELECT id, user, name, email, mobile, role, created_at FROM info"
@@ -669,12 +754,11 @@ def admin_dashboard():
     )
 
 
-@app.route('/admin/analytics-export')
 def admin_analytics_export():
     if session.get('role') != 'admin':
-        return redirect(url_for('admin_login'))
+        return redirect('/admin/login')
 
-    con = sqlite3.connect('signup.db')
+    con = connect_db()
     con.row_factory = sqlite3.Row
 
     total_users = con.execute('SELECT COUNT(*) AS count FROM info').fetchone()['count']
@@ -715,12 +799,11 @@ def admin_analytics_export():
     )
 
 
-@app.route('/admin/export-analytics-csv')
 def export_analytics_csv():
     if session.get('role') != 'admin':
         return redirect(url_for('admin_login'))
 
-    con = sqlite3.connect('signup.db')
+    con = connect_db()
     con.row_factory = sqlite3.Row
     total_users = con.execute('SELECT COUNT(*) AS count FROM info').fetchone()['count']
     total_reviews = con.execute('SELECT COUNT(*) AS count FROM analyzed_reviews').fetchone()['count']
@@ -753,12 +836,11 @@ def export_analytics_csv():
     return response
 
 
-@app.route('/admin/edit/<int:user_id>', methods=['GET', 'POST'])
 def edit_user(user_id):
     if session.get('role') != 'admin':
-        return redirect(url_for('admin_login'))
+        return redirect('/admin/login')
 
-    con = sqlite3.connect('signup.db')
+    con = connect_db()
     con.row_factory = sqlite3.Row
     user = con.execute("SELECT id, user, name, email, mobile, password, role FROM info WHERE id = ?", (user_id,)).fetchone()
     con.close()
@@ -777,7 +859,7 @@ def edit_user(user_id):
         if not username:
             return render_template('admin_edit_user.html', user=dict(user), error='Username is required.')
 
-        con = sqlite3.connect('signup.db')
+        con = connect_db()
         cur = con.cursor()
         if password:
             pwd_err = validate_strong_password(password)
@@ -801,12 +883,11 @@ def edit_user(user_id):
     return render_template('admin_edit_user.html', user=dict(user))
 
 
-@app.route('/admin/delete/<int:user_id>', methods=['POST'])
 def delete_user(user_id):
     if session.get('role') != 'admin':
-        return redirect(url_for('login'))
+        return redirect('/admin/login')
 
-    con = sqlite3.connect('signup.db')
+    con = connect_db()
     cur = con.cursor()
     cur.execute("SELECT user FROM info WHERE id = ?", (user_id,))
     user = cur.fetchone()
@@ -819,14 +900,13 @@ def delete_user(user_id):
     return redirect(url_for('admin_dashboard'))
 
 
-@app.route('/admin/export-excel')
 def export_users_excel():
     if session.get('role') != 'admin':
-        return redirect(url_for('login'))
+        return redirect('/admin/login')
 
     from openpyxl import Workbook
 
-    con = sqlite3.connect('signup.db')
+    con = connect_db()
     con.row_factory = sqlite3.Row
     users = con.execute(
         "SELECT id, user, name, email, mobile, role, created_at FROM info ORDER BY id DESC"
@@ -864,12 +944,11 @@ def export_users_excel():
     return response
 
 
-@app.route('/admin/raw-data')
 def admin_raw_data():
     if session.get('role') != 'admin':
-        return redirect(url_for('login'))
+        return redirect('/admin/login')
 
-    con = sqlite3.connect('signup.db')
+    con = connect_db()
     con.row_factory = sqlite3.Row
     rows = con.execute(
         "SELECT id, user, name, email, mobile, password, role, created_at FROM info ORDER BY id DESC"
@@ -879,7 +958,6 @@ def admin_raw_data():
     return render_template('admin_raw_data.html', rows=rows)
 
 
-@app.route('/logout')
 def logout():
     logout_user()
     session.clear()
@@ -888,7 +966,6 @@ def logout():
 
 BULK_BATCH_CACHE = {}
 
-@app.route('/bulk_upload', methods=['GET', 'POST'])
 def bulk_upload():
     if request.method == 'GET':
         return render_template('bulk_upload.html')
@@ -962,7 +1039,7 @@ def bulk_upload():
         db_records.append((review_text, sentiment, topic, json.dumps(aspects)))
         
     if db_records:
-        con = sqlite3.connect('signup.db')
+        con = connect_db()
         con.executemany(
             'INSERT INTO analyzed_reviews (review_text, sentiment, topic, aspects) VALUES (?, ?, ?, ?)',
             db_records
@@ -995,7 +1072,6 @@ def bulk_upload():
     )
 
 
-@app.route('/download_sample_template')
 def download_sample_template():
     sample_csv = "review_text\n\"The food was delicious and the server was amazingly quick!\"\n\"Room was dirty and wait time was unacceptable.\"\n\"Average product quality, nothing special.\"\n\"Fantastic customer support agent, solved my issue immediately.\"\n\"Packaging was damaged and delivery was delayed by 3 days.\"\n"
     response = Response(sample_csv, mimetype='text/csv')
@@ -1003,7 +1079,6 @@ def download_sample_template():
     return response
 
 
-@app.route('/download_bulk_export')
 def download_bulk_export():
     batch = BULK_BATCH_CACHE.get('last_batch', [])
     fmt = request.args.get('format', 'csv').lower()
@@ -1045,17 +1120,47 @@ def download_bulk_export():
         return response
 
 
-@app.route('/notebook')
 def notebook():
     return render_template('Notebook.html')
+
+def register_routes(app):
+    app.add_url_rule('/', view_func=index, methods=['GET'])
+    app.add_url_rule('/home', view_func=home, methods=['GET'])
+    app.add_url_rule('/about', view_func=about, methods=['GET'])
+    app.add_url_rule('/logon', view_func=logon, methods=['GET'])
+    app.add_url_rule('/login', view_func=login, methods=['GET'])
+    app.add_url_rule('/predict', view_func=upload, methods=['GET', 'POST'])
+    app.add_url_rule('/analytics', view_func=analytics, methods=['GET'])
+    app.add_url_rule('/signup', view_func=signup, methods=['GET', 'POST'])
+    app.add_url_rule('/otp', view_func=otp, methods=['GET', 'POST'])
+    app.add_url_rule('/signin', view_func=signin, methods=['GET', 'POST'])
+    app.add_url_rule('/admin/login', view_func=admin_login, methods=['GET', 'POST'])
+    app.add_url_rule('/admin', view_func=admin_dashboard, methods=['GET'])
+    app.add_url_rule('/admin/analytics-export', view_func=admin_analytics_export, methods=['GET'])
+    app.add_url_rule('/admin/export-analytics-csv', view_func=export_analytics_csv, methods=['GET'])
+    app.add_url_rule('/admin/edit/<int:user_id>', view_func=edit_user, methods=['GET', 'POST'])
+    app.add_url_rule('/admin/delete/<int:user_id>', view_func=delete_user, methods=['POST'])
+    app.add_url_rule('/admin/raw-data', view_func=admin_raw_data, methods=['GET'])
+    app.add_url_rule('/admin/export-users-excel', view_func=export_users_excel, methods=['GET'])
+    app.add_url_rule('/logout', view_func=logout, methods=['GET'])
+    app.add_url_rule('/bulk_upload', view_func=bulk_upload, methods=['GET', 'POST'])
+    app.add_url_rule('/download_sample_template', view_func=download_sample_template, methods=['GET'])
+    app.add_url_rule('/download_bulk_export', view_func=download_bulk_export, methods=['GET'])
+    app.add_url_rule('/notebook', view_func=notebook, methods=['GET'])
+
+
+app = create_app()
+
 
 @app.errorhandler(413)
 def request_entity_too_large(error):
     return render_template('home.html', prediction_error='File payload too large. Maximum allowed upload size is 5 MB.'), 413
 
+
 @app.errorhandler(400)
 def bad_request_error(error):
     return render_template('home.html', prediction_error='Bad request or invalid security CSRF token.'), 400
+
 
 if __name__ == '__main__':
     is_debug = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
